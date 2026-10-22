@@ -1,0 +1,19 @@
+meta {
+  name: 02 Readiness Check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/ready
+  body: none
+  auth: none
+}
+
+docs {
+  Expect: 200, {"ready": true, "checks": {"openemr": true, "anthropic": true,
+  "langfuse": true}}. This actively checks each real dependency (OpenEMR's
+  FHIR API, the Anthropic API, Langfuse) -- not a hardcoded 200. If any
+  dependency is actually down, this returns 503 with that specific check
+  marked false.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: 01 Patient Header (pid1)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/patient?patient_id=98c4b82b-b07e-11f1-8334-022958ad0af8
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: copilot_session={{copilot_session}}
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a real,
+  still-valid session cookie -- see bruno/README.md. Without it this 401s with
+  {"detail": "Not logged in."} -- confirmed live 2026-09-20.
+
+  pid1 = Alice Testpatient (same fixture as chat/01). With a valid session,
+  expect 200:
+    {"patient_id": "98c4b82b-b07e-11f1-8334-022958ad0af8",
+     "name": "Alice Testpatient", "birth_date": "1972-03-14",
+     "gender": "female"}
+  -- confirmed live 2026-09-20, matching app/main.py's PatientHeader model.
+
+  patient_id is required and must be a valid UUID (400 "Invalid patient id."
+  if malformed, 404 "Patient not found." if well-formed but no such patient).
+  Used by /ui's persistent patient header; this request lets you check the
+  same lookup directly without going through the chat form.
+}

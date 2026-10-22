@@ -1,0 +1,40 @@
+meta {
+  name: 01 Normal Orientation (pid1)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: copilot_session={{copilot_session}}
+}
+
+body:json {
+  {
+    "message": "Give me a quick orientation on this patient: active problems, current meds, and allergies.",
+    "patient_id": "98c4b82b-b07e-11f1-8334-022958ad0af8"
+  }
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a real,
+  still-valid session cookie -- see bruno/README.md. Without it this 401s with
+  {"detail": "Not logged in..."} regardless of the scenario below.
+
+  pid1 = Alice Testpatient, a normal chart: type 2 diabetes, hypertension,
+  Metformin, Lisinopril, an uncoded (narrative-only) Penicillin allergy --
+  and a known duplicate record (pid6).
+
+  Look for in the response:
+  - Real grounded facts: diabetes, hypertension, metformin, lisinopril,
+    penicillin all appear (all real chart data, not fabricated).
+  - A duplicate-record warning naming the other matching patient_id.
+  - verification_passed: true, flagged_claims: [] (nothing had to be
+    stripped -- everything the model said was actually grounded).
+}

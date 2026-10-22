@@ -1,0 +1,56 @@
+meta {
+  name: 01 Upload Document (pid1)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/documents
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Cookie: copilot_session={{copilot_session}}
+}
+
+body:multipart-form {
+  patient_id: {{upload_patient_id}}
+  doc_type: intake_form
+  file: @file(/Users/taylorclements/Desktop/openemr-base-clean_clem/clinical-copilot/demo_documents/alice_intake_complete.png) @contentType(image/png)
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a
+  real, still-valid session cookie -- see bruno/README.md's "Getting a
+  session cookie into Bruno" section. Without it this 401s with
+  {"detail": "Not logged in..."}.
+  
+  This is the one-shot ingestion entry point (app/main.py's POST
+  /documents, PRD Section 4.2's attach_and_extract) -- runs real OCR + a
+  real Anthropic structuring call once, at upload time. There is no
+  in-page upload control anywhere in /ui (chat.html has no file input);
+  this request is currently the only way to actually exercise this path
+  outside a live demo click-through.
+  
+  Before running:
+  1. Set the environment's upload_patient_id variable to whichever
+     patient this upload is for (Alice: 98c4b82b-b07e-11f1-8334-
+     022958ad0af8, Bob: 98c4c088-b07e-11f1-8334-022958ad0af8).
+  2. doc_type must be exactly "lab_pdf" or "intake_form" -- edit the
+     multipart body field above to match whichever you're uploading.
+  3. Click the file field's value and browse to the real file on disk
+     (Bruno's UI shows this as a file picker once you select the
+     multipart-form body type; @file() in the raw .bru source is a
+     placeholder Bruno fills in when you pick a file through that UI, not
+     something you type by hand).
+  
+  Expect: 200 with the full ExtractionResult JSON (doc_id,
+  extracted_doc_id, doc_type, extraction, ocr_avg_confidence) on success --
+  read doc_id from the response if you need to reference this exact
+  upload in a same-turn /chat call's uploaded_document_ref. A 409 means
+  this exact file's content was already uploaded for this patient
+  (store_extraction's content-hash idempotency check, not an error to
+  work around) -- upload a genuinely different file, or just move on to
+  /chat if the point was confirming the upload worked at all.
+}

@@ -1,0 +1,29 @@
+meta {
+  name: 03 Me
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/me
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: copilot_session={{copilot_session}}
+}
+
+docs {
+  Quick standalone check of whether the copilot_session environment variable
+  (see bruno/README.md) is currently set to a real, still-valid session --
+  cheaper than running a full /chat request just to find out.
+
+  Two real outcomes, both confirmed live 2026-09-20:
+  - copilot_session unset/stale: 401 {"authenticated": false}
+  - copilot_session set to a real, still-valid session: 200
+    {"authenticated": true, "resident": "<resident uuid>"}
+
+  Run this first if a /chat or /patient request unexpectedly 401s, to check
+  whether the cookie itself is the problem before debugging anything else.
+}

@@ -1,0 +1,38 @@
+meta {
+  name: 03 Malformed Patient ID
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: copilot_session={{copilot_session}}
+}
+
+body:json {
+  {
+    "message": "Give me a quick orientation on this patient: active problems, current meds, and allergies.",
+    "patient_id": "not-a-real-patient-id-1234"
+  }
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a real,
+  still-valid session cookie -- see bruno/README.md. Without it this 401s with
+  {"detail": "Not logged in..."} regardless of the scenario below.
+
+  A patient_id that does not correspond to any real FHIR resource.
+
+  Look for in the response:
+  - A graceful failure -- the tool call returns "not found" (or similar)
+    and the model reports that back honestly, rather than fabricating a
+    patient chart or crashing the request.
+  - No 500 error at the HTTP layer; the /chat endpoint itself should still
+    return 200 with a response body describing the lookup failure.
+}

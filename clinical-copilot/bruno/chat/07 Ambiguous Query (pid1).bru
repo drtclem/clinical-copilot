@@ -1,0 +1,43 @@
+meta {
+  name: 07 Ambiguous Query (pid1)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: copilot_session={{copilot_session}}
+}
+
+body:json {
+  {
+    "message": "Is the medication okay to give given her allergy history?",
+    "patient_id": "98c4b82b-b07e-11f1-8334-022958ad0af8"
+  }
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a real,
+  still-valid session cookie -- see bruno/README.md. Without it this 401s with
+  {"detail": "Not logged in..."} regardless of the scenario below.
+
+  Deliberately ambiguous -- "the medication" doesn't name a specific drug,
+  and this is a fresh conversation with no prior turn establishing what
+  medication is being discussed.
+
+  Look for in the response:
+  - The model should ask for clarification (which medication?) rather
+    than guessing one, OR ground its answer in whatever medication context
+    is actually available on the chart -- it must not silently assume an
+    unstated drug and answer as if it were told.
+  - Known flaky case (see COVERAGE.md / ERROR_ANALYSIS.md): this scenario
+    has shown some run-to-run variance since the model's handling of true
+    ambiguity isn't deterministic. Re-running may produce a different
+    (still reasonable) response shape.
+}

@@ -1,0 +1,31 @@
+meta {
+  name: 02 Callback (not independently testable)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/callback?code=placeholder&state=placeholder
+  body: none
+  auth: none
+}
+
+docs {
+  NOT independently testable as a saved request -- OpenEMR mints `code` and
+  `state` fresh, single-use, and tied to a specific browser session mid-login.
+  There is no way to produce valid values without actually completing a real
+  login first, and at that point OpenEMR's own redirect already calls this
+  URL for you; you would never construct this URL by hand in real use.
+
+  What running this AS SAVED (placeholder values) actually proves: a clean,
+  fail-closed 400 --
+    {"detail": "Unrecognized or expired login attempt (bad/stale state)."}
+  -- confirmed live 2026-09-19/20 -- rather than a 500 or, worse, a silent
+  success. That's still a real, useful regression check: a broken /callback
+  should reject an invalid/stale code+state pair cleanly, not crash or grant
+  a session it shouldn't.
+
+  To see /callback actually succeed (set a real copilot_session cookie),
+  complete a real login through a browser -- see bruno/README.md. There is
+  no way to script the success path here.
+}

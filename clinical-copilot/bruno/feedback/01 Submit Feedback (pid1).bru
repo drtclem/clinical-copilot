@@ -1,0 +1,54 @@
+meta {
+  name: 01 Submit Feedback (pid1)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/feedback
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: copilot_session={{copilot_session}}
+}
+
+body:json {
+  {
+    "correlation_id": "fd899c3e-3101-44aa-a98e-6ac14d29f9ad",
+    "rating": "up",
+    "comment": "Correctly caught the duplicate record and flagged the odd AUDIT TEST problem-list entries.",
+    "patient_id": "98c4b82b-b07e-11f1-8334-022958ad0af8"
+  }
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a real,
+  still-valid session cookie -- see bruno/README.md. Without it this 401s with
+  {"detail": "Not logged in..."} regardless of the scenario below.
+
+  correlation_id must be a real value from a `/chat` response's own
+  `correlation_id` field, made under the SAME session this request uses --
+  it is how the feedback gets attached to that turn's Langfuse trace
+  (TurnObserver.attach_feedback_score re-derives the trace id by seeding
+  create_trace_id with this value, it is never the trace id itself). The
+  value saved here is real but historical (from chat/01's scenario, run
+  live against the droplet 2026-09-20) -- it won't mean anything on a
+  fresh run. Run chat/01 first, copy its response's correlation_id, and
+  paste it in here before sending.
+
+  rating is required ("up" or "down"); comment and patient_id are both
+  optional. resident_username is never read from this body -- it always
+  comes from the session, even if you add it here.
+
+  Confirmed live 2026-09-20 against the droplet, with a real correlation_id
+  from a real chat/01 call under this same session: 200
+    {"status": "recorded", "langfuse_attached": true}
+  -- and independently confirmed both durable copies actually landed: the
+  entry appended to feedback.jsonl, and a `resident_feedback` score (value
+  1, this exact comment) on the turn's real Langfuse trace, found by
+  querying the droplet's ClickHouse directly for the same trace_id
+  TurnObserver derives from this correlation_id.
+}

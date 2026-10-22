@@ -1,0 +1,29 @@
+meta {
+  name: 01 Start Login
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/login
+  body: none
+  auth: none
+}
+
+docs {
+  Starts the real OpenEMR authorization_code login flow. Expect: 307,
+  Location header pointing at https://<openemr-host>/oauth2/default/authorize
+  with this app's real client_id/redirect_uri/scope/state/PKCE challenge --
+  confirmed live 2026-09-20.
+
+  Depending on your Bruno client's redirect-following setting, you may see
+  this raw 307 (Location header visible) or the followed OpenEMR sign-in
+  page HTML instead. Either is fine for confirming the redirect fires; this
+  request cannot complete the interactive sign-in + consent screens that
+  follow, since that needs a real browser -- see bruno/README.md for how to
+  actually obtain a working session from this flow.
+
+  This is NOT itself a /chat auth check -- it only proves /login redirects
+  correctly. Use auth/03 Me to confirm whether your copilot_session
+  environment variable is currently valid.
+}

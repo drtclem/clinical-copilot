@@ -1,0 +1,236 @@
+# Clinical Co-Pilot eval gate (Decision 5.5). Pinned to the self-hosted
+# "staging" runner (a dedicated staging droplet, decoupled from
+# production/grading -- Decision 5.1) via `tags:` below, so this never
+# silently falls back to GitLab's shared runners.
+#
+# eval_unit_tests runs evals/unit_tests.py: LLM-free (no Anthropic key
+# needed), but still exercises real FHIR calls against the staging OpenEMR
+# instance, so it's a meaningful gate on its own and works even before an
+# ANTHROPIC_API_KEY is provisioned on the runner. The full Golden Set
+# (evals/run_evals.py, real Anthropic + FHIR calls) is wired the same way
+# and will run once ANTHROPIC_API_KEY is added to
+# /etc/clinical-copilot-ci.env on the staging droplet.
+#
+# Pipeline-run reduction (2026-09-24, see EVAL_GATE.md #2 for the full
+# rationale): none of this weakens the actual pre-merge gate -- a
+# non-draft MR that touches clinical-copilot/ code still runs the full
+# eval stage and still blocks on regression. It only skips runs that
+# can't tell us anything new: docs-only changes, work still marked
+# Draft, and a superseded pipeline that a newer push already obsoletes.
+#   - eval_golden_set/eval_graph_cases are `changes:`-scoped to this file
+#     plus clinical-copilot/ code paths -- a *.md-only MR skips them.
+#     .gitlab-ci.yml is in that list too: a change to these jobs' own
+#     rules/config should re-validate itself, not skip on the technicality
+#     that it isn't "clinical-copilot/ code." No custom OpenEMR module or
+#     other out-of-tree runtime dependency exists for this feature to add
+#     here -- confirmed by grep: the agent only ever talks to a stock
+#     OpenEMR instance over its standard FHIR/OAuth REST API, and the
+#     eval rubric/thresholds all live under clinical-copilot/evals/ already.
+#   - eval_golden_set/eval_graph_cases skip on Draft MRs
+#     (CI_MERGE_REQUEST_DRAFT). Marking an MR Ready does NOT start a new
+#     pipeline, so a Draft's green pipeline must never count as passed:
+#     eval_gate_pending (below) keeps every Draft pipeline blocked, and a
+#     fresh MR pipeline must be created after Ready (see EVAL_GATE.md #2).
+#     eval_unit_tests runs on Drafts too -- it's cheap/LLM-free, so there's
+#     no cost reason to withhold it.
+#   - Every eval-stage job is interruptible; workflow.auto_cancel below
+#     cancels a running interruptible job when a newer commit lands on the
+#     same ref, so only the latest push's pipeline is ever paid for.
+#   - eval_golden_set/eval_graph_cases no longer run on main (post-merge)
+#     pipelines -- they already ran and blocked at MR time; re-running
+#     them again after merge with no new diff is pure cost. eval_unit_tests
+#     still runs on main (cheap, LLM-free, catches anything environment-
+#     specific to the main ref itself).
+#   - Set $FORCE_FULL_EVAL=true on a manually-triggered pipeline (GitLab UI
+#     "Run pipeline", or `glab ci run --variables FORCE_FULL_EVAL:true`) to
+#     force the full eval stage regardless of draft state, changed paths,
+#     or branch -- see EVAL_GATE.md #2 for when you'd want this.
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
+stages:
+  - prune
+  - eval
+
+.staging_runner:
+  tags:
+    - staging
+  before_script:
+    - source /etc/clinical-copilot-ci.env
+    - cd clinical-copilot
+    - python3 -m venv .venv
+    - .venv/bin/pip install -q -r requirements.txt
+
+# evals/prune_upload_fixture.py: soft-deletes the accumulated Source
+# Document / AI-Extracted Pending Review documents on the dedicated
+# upload-eval fixture patient (TEST-0007) before eval_golden_set runs, so
+# months of CI runs don't leave an unbounded number of documents on that
+# one patient (evals/fixtures.py's own comment already names this as the
+# reason that patient exists, separate from PID1/PID2).
+#
+# Dry-run (the script's own default -- lists what it would prune, changes
+# nothing) unless $PRUNE_UPLOAD_FIXTURE_LIVE is explicitly set to "true" as
+# a GitLab CI/CD variable -- a deliberate, separate human action, not
+# something merging this job's config alone can trigger. Requires
+# PRUNE_DB_HOST/PORT/USER/PASSWORD/NAME set via /etc/clinical-copilot-ci.env,
+# same convention as the rest of this file's secrets. PRUNE_DB_USER/PASSWORD
+# is a dedicated account scoped to SELECT on patient_data and UPDATE on
+# documents, not the full database root password (created 2026-09-25 --
+# see evals/prune_upload_fixture.py's own module docstring). PRUNE_MYSQL_
+# CLIENT=mariadb is also required here -- docker/development-easy's own
+# mariadb:11.8.8 image ships no `mysql` binary at all, found live the same
+# day.
+#
+# KNOWN GAP, found live 2026-09-25, not yet fixed: this runner is a shell
+# executor on the SAME host as the mysql container (EVAL_GATE.md's own
+# note), so PRUNE_DB_HOST here is 127.0.0.1 (mysql's published port,
+# confirmed live: `docker port` -> 127.0.0.1:8320) -- a real, in-use
+# staging value, not a placeholder. But evals/prune_upload_fixture.py's
+# _validate_host() treats ANY loopback host as exempt "local dev,
+# inherently safe" and never checks --staging-host/PRUNE_STAGING_DB_HOST
+# for it at all. So on THIS runner specifically, the staging-host
+# confirmation this job's config still sets (PRUNE_STAGING_DB_HOST) is
+# effectively inert -- it's never actually evaluated, because 127.0.0.1
+# short-circuits the check before that comparison ever runs. The
+# production-host refusal (PRODUCTION_DB_HOST, unconditional) still holds
+# regardless. Not fixed here -- the loopback exemption's premise (127.0.0.1
+# = someone's personal dev sandbox) is simply wrong for a shell-executor
+# runner colocated with the real staging DB; fixing it needs a real
+# decision (e.g. an explicit --environment flag instead of inferring
+# safety from the host string), not a quick patch, so it's flagged, not
+# patched, tonight.
+#
+# allow_failure: true to start, same precedent eval_graph_cases set below
+# for a job not yet proven reliable against a real server -- this script
+# has never run against staging as of this writing; revisit once it has.
+prune_upload_fixture:
+  stage: prune
+  extends: .staging_runner
+  script:
+    - |
+      if [ "$PRUNE_UPLOAD_FIXTURE_LIVE" = "true" ]; then
+        .venv/bin/python -m evals.prune_upload_fixture --execute
+      else
+        .venv/bin/python -m evals.prune_upload_fixture
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: true
+
+eval_unit_tests:
+  stage: eval
+  extends: .staging_runner
+  interruptible: true
+  script:
+    - .venv/bin/python -m evals.unit_tests
+  # Runs on Draft MRs too (unlike eval_golden_set/eval_graph_cases below) --
+  # it's LLM-free and cheap, so there's no cost reason to withhold it, and
+  # fast feedback on a WIP MR is worth more than the save.
+  rules:
+    - if: '$FORCE_FULL_EVAL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+eval_golden_set:
+  stage: eval
+  extends: .staging_runner
+  interruptible: true
+  script:
+    - .venv/bin/python -m evals.run_evals
+  # Per-case results, including any FLAKE (failed once, passed on a serial
+  # rerun) and each case's first-attempt reason. `when: always` so a failing
+  # run still uploads it.
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - clinical-copilot/evals/last_run_results.json
+  rules:
+    - if: '$FORCE_FULL_EVAL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_DRAFT == "true"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - ".gitlab-ci.yml"
+        - "clinical-copilot/app/**/*"
+        - "clinical-copilot/evals/**/*"
+        - "clinical-copilot/requirements.txt"
+  # No `main`-branch rule: this job already ran and blocked at MR time --
+  # see the pipeline-run-reduction comment at the top of this file.
+  # 2026-09-22: allow_failure removed now that a genuinely clean run is
+  # confirmed reliable (pipeline 25431) -- this job's own pass/fail now
+  # actually blocks the protected-branch merge rule (Investigation 7),
+  # instead of the pipeline-level status silently masking a real job
+  # failure the way it did through pipelines 25393-25412 while this was
+  # still set. retry: 1 covers the known failure mode that's actually
+  # occurred so far -- live-model phrasing variance occasionally tripping
+  # one Golden Set case's keyword-based check on an otherwise-correct
+  # response (twice, same session, see evals/cases.py's per-case
+  # docstrings) -- by re-running the full job once before blocking the
+  # merge. A case that fails on BOTH the original run and the retry is
+  # treated as a real failure, not smoothed over.
+  retry: 1
+
+# 2026-09-22: added the same night as the LangGraph multi-agent work
+# (routing, multi-worker synthesis, citation translation, the RAG/
+# ingestion integration into a live turn) it exists to cover -- found,
+# investigating that night's pipeline, that NONE of it had any automated
+# coverage: eval_unit_tests exercises pure-logic pieces of the new code in
+# isolation, and eval_golden_set drives ClinicalCopilotAgent.run_turn()
+# directly (Week 1's path), never app/graph/build.py's run_turn(). Every
+# bit of validation the graph itself got that night was a manual, local,
+# live run -- genuine, but not a regression gate. This job closes that.
+#
+# It started allow_failure: true (mirroring eval_golden_set's own history:
+# that job also ran allow_failure until its pass rate was trusted). 2026-09-25:
+# now BLOCKING. Evidence from the pipeline API: it succeeded on the last 3
+# completed pipelines (28566, 28733, 28900) and in fact on the last 7
+# completed runs, every one on its first attempt with no retry consumed. A
+# failure here now stops a merge, like eval_golden_set. retry: 1 stays for
+# the same reason it does there (an occasional live-model phrasing flake); a
+# case that fails on both attempts blocks.
+eval_graph_cases:
+  stage: eval
+  extends: .staging_runner
+  interruptible: true
+  script:
+    - .venv/bin/python -m evals.graph_cases
+  rules:
+    - if: '$FORCE_FULL_EVAL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_DRAFT == "true"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - ".gitlab-ci.yml"
+        - "clinical-copilot/app/**/*"
+        - "clinical-copilot/evals/**/*"
+        - "clinical-copilot/requirements.txt"
+  # No `main`-branch rule -- see eval_golden_set's comment above.
+  retry: 1
+
+# Closes the Draft-MR gate loophole. Draft pipelines skip the two expensive
+# eval jobs above, and marking an MR Ready does not create a new pipeline,
+# so without this job a Draft's all-green pipeline could satisfy "pipeline
+# must succeed" with the evals never having run. This job exists only on
+# Draft MR pipelines, is manual, and is NOT allowed to fail: a manual job
+# that was never played leaves the pipeline "blocked" (not success), which
+# stops the merge. Playing it does not clear it -- it always fails -- so the
+# only way to a passing pipeline is a new, non-Draft MR pipeline that runs
+# the real evals (mark Ready, then create a new MR pipeline).
+eval_gate_pending:
+  stage: eval
+  tags:
+    - staging
+  interruptible: true
+  script:
+    - echo "BLOCKED - this is a Draft MR pipeline; the Golden Set and graph evals did NOT run."
+    - echo "Mark the MR Ready, then create a NEW merge request pipeline (Pipelines tab > Run pipeline, or POST projects/:id/merge_requests/:iid/pipelines)."
+    - echo "Marking Ready alone does not start one. Playing this job never passes it."
+    - exit 1
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_DRAFT == "true"'
+      when: manual
+      allow_failure: false

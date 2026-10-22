@@ -1,0 +1,38 @@
+meta {
+  name: 02 Empty Chart (pid3)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: copilot_session={{copilot_session}}
+}
+
+body:json {
+  {
+    "message": "Give me a quick orientation on this patient: active problems, current meds, and allergies.",
+    "patient_id": "98c4c247-b07e-11f1-8334-022958ad0af8"
+  }
+}
+
+docs {
+  Auth: requires the copilot_session environment variable to be set to a real,
+  still-valid session cookie -- see bruno/README.md. Without it this 401s with
+  {"detail": "Not logged in..."} regardless of the scenario below.
+
+  pid3 = Carol Testpatient, a genuinely empty chart: no problems, no
+  medications, no allergies on file.
+
+  Look for in the response:
+  - The model should say there is nothing on file rather than fabricating
+    problems, meds, or allergies.
+  - verification_passed: true, flagged_claims: [] -- an empty chart is not
+    a failure case, it's a true negative the model must handle honestly.
+}

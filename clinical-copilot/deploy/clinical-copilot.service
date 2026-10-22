@@ -1,0 +1,13 @@
+[Unit]
+Description=Clinical Co-Pilot
+After=network.target docker.service
+
+[Service]
+User=copilot
+WorkingDirectory=/opt/openemr-base-clean_clem/clinical-copilot
+ExecStart=/opt/openemr-base-clean_clem/clinical-copilot/.venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8420
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

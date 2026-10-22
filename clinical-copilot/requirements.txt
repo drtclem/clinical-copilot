@@ -1,0 +1,182 @@
+httpx==0.28.1
+pydantic==2.13.5
+# Pinned exactly, not >=0.40: that loose floor let pip resolve 1.8.0 on the
+# staging runner -- a major version jump whose Messages.create() dropped
+# `temperature` entirely (replaced by output_config's "effort", a
+# different concept -- reasoning depth, not sampling determinism) and
+# added output_config/thinking/etc. Confirmed live: code written against
+# the older, assumed-stable `temperature` parameter crashed every call
+# that passed it with "unexpected keyword argument". Exact pin so
+# local/CI/deploy always resolve the same SDK surface, not whatever >=0.40
+# happens to satisfy on a given install.
+anthropic==1.8.0
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+langfuse==4.15.6
+python-dotenv==1.2.3
+locust==2.46.6
+# Pinned exactly to the versions confirmed compatible with the rest of this
+# stack during Investigations 3/4 (Week 2 build notes, Section 1 item 8):
+# `pip check` clean both before and after against this exact pinned set,
+# and a real end-to-end LangGraph + self-hosted Langfuse trace confirmed
+# working. All three required together -- langgraph alone doesn't pull in
+# langchain, which langfuse.langchain.CallbackHandler needs.
+langgraph==1.2.12
+langchain-core==1.6.4
+langchain==1.4.2
+# app/retrieval/ (Checklist item 3, PRD Section 4.3): self-hosted embedding
+# + rerank models. sentence-transformers pulls in torch/transformers as
+# transitive deps -- `pip check` clean against the full stack above after
+# adding this. The models themselves (all-MiniLM-L6-v2,
+# ms-marco-MiniLM-L-6-v2) are fetched from the HF Hub on first use and
+# cached, not vendored here -- see app/retrieval/embeddings.py and
+# app/retrieval/rerank.py's module docstrings for the measured combined
+# memory footprint (~565MB) that ruled out the BGE-family alternative.
+sentence-transformers==6.1.0
+# The sparse half of RRF fusion (PRD Section 4.3) -- a small, dependency-free
+# BM25 implementation (no separate search-engine process, matching this
+# corpus' scale: a handful of curated documents, not a real search index).
+rank-bm25==0.2.2
+# app/main.py's POST /documents multipart file upload (Checklist item 4) --
+# FastAPI's own Form()/UploadFile support requires this at runtime.
+python-multipart==0.0.32
+# app/ingestion/ocr.py (Checklist item 4, PRD Section 4.2): OCR-first
+# extraction. pytesseract is a thin binding -- the actual OCR engine
+# (Tesseract 5.5.3) and pdf2image's backend (poppler-utils' pdftoppm) are
+# both host/container binaries, not pip packages; see README.md's setup
+# section for the apt/brew install this needs in any environment that
+# doesn't already have them (confirmed present in this dev container).
+pytesseract==0.3.13
+pdf2image==1.17.0
+pillow==12.3.0
+
+# Transitive dependencies, pinned exactly so local/CI/deploy resolve the same set.
+# Source: `pip freeze` of the CI runner's venv (staging runner, .venv) as of pipeline
+# #28200 (2026-09-25), taken after `pip install -r` of the pre-pin ranges above. The
+# nvidia-*/cuda-*/triton entries are Linux-only torch companions; they carry a platform
+# marker so the file still installs on macOS. Regenerate by re-freezing, not by hand.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+backoff==2.2.1
+bidict==0.24.1
+blinker==1.9.0
+brotli==1.2.0
+certifi==2026.7.22
+charset-normalizer==3.5.1
+click==8.5.0
+cloudpickle==3.1.2
+ConfigArgParse==1.7.7
+cuda-bindings==13.4.3 ; sys_platform == "linux"
+cuda-pathfinder==1.8.2 ; sys_platform == "linux"
+cuda-toolkit==13.0.3.0 ; sys_platform == "linux"
+distro==1.9.0
+docstring_parser==0.18.0
+filelock==4.0.3
+Flask==3.1.3
+flask-cors==6.0.5
+Flask-Login==0.6.3
+fsspec==2026.9.0
+gevent==26.9.0
+geventhttpclient==2.3.9
+googleapis-common-protos==1.75.4
+greenlet==3.5.6
+h11==0.16.0
+hf-xet==1.6.0
+httpcore==1.0.9
+httpcore2==2.13.1
+httptools==0.8.0
+httpx2==2.13.1
+huggingface_hub==1.33.0
+idna==3.20
+iniconfig==2.3.0
+itsdangerous==2.2.0
+Jinja2==3.1.6
+jiter==0.17.0
+joblib==1.6.0
+jsonpatch==1.33
+jsonpointer==3.1.1
+langchain-protocol==0.0.19
+langgraph-checkpoint==4.2.0
+langgraph-prebuilt==1.1.0
+langgraph-sdk==0.4.5
+langsmith==0.14.0
+markdown-it-py==4.2.0
+MarkupSafe==3.0.3
+mdurl==0.1.2
+mpmath==1.3.0
+msgpack==1.2.2
+narwhals==2.26.0
+networkx==3.7
+numpy==2.5.3
+nvidia-cublas==13.1.1.3 ; sys_platform == "linux"
+nvidia-cuda-cupti==13.0.85 ; sys_platform == "linux"
+nvidia-cuda-nvrtc==13.0.88 ; sys_platform == "linux"
+nvidia-cuda-runtime==13.0.96 ; sys_platform == "linux"
+nvidia-cudnn-cu13==9.24.0.43 ; sys_platform == "linux"
+nvidia-cufft==12.0.0.61 ; sys_platform == "linux"
+nvidia-cufile==1.15.1.6 ; sys_platform == "linux"
+nvidia-curand==10.4.0.35 ; sys_platform == "linux"
+nvidia-cusolver==12.0.4.66 ; sys_platform == "linux"
+nvidia-cusparse==12.6.3.3 ; sys_platform == "linux"
+nvidia-cusparselt-cu13==0.8.1 ; sys_platform == "linux"
+nvidia-nccl-cu13==2.30.7 ; sys_platform == "linux"
+nvidia-nvjitlink==13.4.92 ; sys_platform == "linux"
+nvidia-nvshmem-cu13==3.4.5 ; sys_platform == "linux"
+nvidia-nvtx==13.0.85 ; sys_platform == "linux"
+opentelemetry-api==1.44.0
+opentelemetry-exporter-otlp-proto-common==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-proto==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-semantic-conventions==0.65b0
+orjson==3.12.0
+ormsgpack==1.12.2
+packaging==26.3
+pluggy==1.6.0
+protobuf==7.36.2
+psutil==7.2.2
+pydantic_core==2.46.5
+Pygments==2.21.0
+pytest==9.1.1
+python-engineio==4.14.0
+python-socketio==5.17.0
+PyYAML==6.0.3
+pyzmq==27.2.0
+regex==2026.9.10
+requests==2.34.2
+requests-toolbelt==1.0.0
+rich==15.0.0
+safetensors==0.8.0
+scikit-learn==1.9.1
+scipy==1.18.1
+setuptools==84.0.0
+shellingham==1.5.4
+simple-websocket==1.1.0
+sniffio==1.3.1
+starlette==1.7.0
+sympy==1.14.0
+tenacity==9.1.4
+threadpoolctl==3.7.0
+tokenizers==0.23.2
+torch==2.14.0
+tqdm==4.70.1
+transformers==5.17.0
+triton==3.8.0 ; sys_platform == "linux"
+truststore==0.10.4
+typer==0.27.2
+typing_extensions==4.16.0
+typing-inspection==0.4.4
+urllib3==2.8.0
+uuid_utils==0.17.1
+uvloop==0.22.1
+watchfiles==1.3.0
+websocket-client==1.9.2
+websockets==16.1.1
+Werkzeug==3.1.8
+wrapt==2.4.1
+wsproto==1.3.2
+xxhash==4.0.1
+zope.event==6.2
+zope.interface==8.6
+zstandard==0.25.0

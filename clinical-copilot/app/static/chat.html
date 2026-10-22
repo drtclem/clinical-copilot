@@ -1,0 +1,2523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentForge Clinical Co-Pilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14181B;
+    --panel: #1D2226;
+    --panel-2: #20262A;
+    --border: #2A3136;
+    --ink: #EDEFEF;
+    --ink-soft: #9AA5A9;
+    --accent: #D98E3B;
+    --accent-soft: rgba(217, 142, 59, 0.14);
+    --accent-ink: #1B140A;
+    --warn: #E5645A;
+    --warn-soft: rgba(229, 100, 90, 0.12);
+    --ref: #7FA6C9;
+    --ref-soft: rgba(127, 166, 201, 0.08);
+    --cite: #8FBF7F;
+    --cite-soft: rgba(143, 191, 127, 0.12);
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; }
+
+  [hidden] { display: none !important; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+  }
+
+  .brand-text .name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .brand-text .role {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  #resident {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .badge {
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 5px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  /* Patient identity -- always visible while a chart is open. */
+  .patient-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    font-size: 14px;
+  }
+
+  .patient-bar .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .patient-bar .pname { font-size: 16px; font-weight: 600; }
+  .patient-bar .pmeta { color: var(--ink-soft); }
+  .patient-bar .pid {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    overflow-wrap: anywhere;
+  }
+  .patient-bar.error { border-left: 3px solid var(--warn); }
+  .patient-bar.error .pmeta { color: var(--warn); }
+
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .gate {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  .gate p { margin: 0; max-width: 420px; line-height: 1.55; }
+
+  .row {
+    display: flex;
+    max-width: 640px;
+    width: 100%;
+  }
+
+  .row.agent { align-self: flex-start; gap: 12px; }
+  .row.user { align-self: flex-end; justify-content: flex-end; }
+
+  .avatar {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bubble-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .bubble {
+    padding: 14px 18px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .bubble.agent {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px 16px 16px 16px;
+  }
+
+  .bubble.agent.error { border-color: var(--warn); }
+
+  .bubble.user {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 16px 4px 16px 16px;
+    max-width: 480px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .bubble.agent p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+  .bubble.agent p + p,
+  .bubble.agent .verified-line + p { margin-top: 10px; }
+
+  .verified-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .verified-line svg { flex-shrink: 0; margin-top: 2px; }
+
+  /* Verification problems and enforced warnings: never collapsed. */
+  .warn {
+    border: 1px solid var(--warn);
+    background: var(--warn-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .warn-title { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; }
+  .warn-title svg { flex-shrink: 0; margin-top: 3px; }
+
+  .warn h4 {
+    margin: 10px 0 2px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .warn ul { margin: 0; padding-left: 18px; }
+  .warn li { overflow-wrap: anywhere; }
+
+  .group { display: flex; flex-direction: column; gap: 6px; }
+
+  .group-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+
+  /* Citations (Checklist item 7): a document/guideline chip a resident can
+     click to see exactly where a claim came from -- distinct color from
+     the plain, non-clickable chart-source chips above. */
+  .cite-group .group-label { color: var(--cite); }
+
+  .chip.clickable {
+    color: var(--cite);
+    border-color: var(--cite);
+    background: var(--cite-soft);
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+  }
+
+  .chip.clickable:hover { filter: brightness(1.1); }
+  .chip.clickable:focus-visible { outline: 2px solid var(--cite); outline-offset: 2px; }
+
+  /* Click-to-source modal/lightbox. */
+  .citation-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 100;
+  }
+
+  .citation-modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: min(720px, 100%);
+    max-height: 100%;
+    overflow: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .citation-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .citation-modal-title { font-weight: 600; font-size: 15px; }
+  .citation-modal-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+  }
+
+  .citation-modal-close {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--ink);
+    border-radius: 999px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .citation-preview-wrap {
+    position: relative;
+    flex-shrink: 0; /* keep the page's natural height (the modal scrolls) so highlight percentages line up with the image */
+    line-height: 0;
+    background: var(--bg);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .citation-preview-wrap img { width: 100%; display: block; }
+
+  .citation-highlight {
+    position: absolute;
+    border: 2px solid var(--warn);
+    background: rgba(229, 100, 90, 0.18);
+    pointer-events: none;
+  }
+
+  .citation-text {
+    font-size: 14px;
+    line-height: 1.55;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+  }
+
+  .cite-passages { display: flex; flex-direction: column; gap: 10px; }
+  .cite-passage {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+  .cite-passage-heading {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cite);
+    margin-bottom: 4px;
+  }
+  .cite-passage-body ul { margin: 4px 0 4px 18px; padding: 0; }
+
+  .citation-status {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  /* Citation cards: one per source document (or guideline passage). The
+     thumbnail is blurred on purpose -- enough to recognize the page, not
+     to read PHI in the transcript; the sharp page opens in the modal. */
+  .cite-cards { display: flex; flex-direction: column; gap: 8px; }
+
+  .cite-card {
+    border: 1px solid var(--cite);
+    background: var(--cite-soft);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cite-card-main {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    width: 100%;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .cite-card-main:focus-visible,
+  .cite-field:focus-visible,
+  .cite-more:focus-visible { outline: 2px solid var(--cite); outline-offset: 2px; }
+
+  .cite-thumb {
+    flex-shrink: 0;
+    width: 64px;
+    height: 84px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-soft);
+    font-size: 11px;
+  }
+
+  .cite-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    filter: blur(5px);
+    transform: scale(1.12);
+  }
+
+  .cite-meta { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .cite-title { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+  .cite-sub { font-size: 12px; color: var(--ink-soft); }
+
+  .cite-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cite);
+    border: 1px solid var(--cite);
+    border-radius: 999px;
+    padding: 1px 8px;
+    align-self: flex-start;
+  }
+
+  .notice-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+  .chip.notice { color: var(--ink-soft); border-color: var(--border); font-style: normal; }
+  .chip.notice.warning { color: var(--warn); border-color: var(--warn); }
+  .notice-text { font-size: 13px; color: var(--ink-soft); }
+
+  .cite-badge.dup { color: var(--ink-soft); border-color: var(--border); }
+
+  .cite-fields { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+  .cite-field {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .cite-field:hover { border-color: var(--cite); }
+  .cite-field-label { color: var(--ink-soft); flex-shrink: 0; }
+  .cite-field-value { min-width: 0; overflow-wrap: anywhere; }
+
+  .cite-more {
+    align-self: flex-start;
+    background: transparent;
+    border: 0;
+    color: var(--cite);
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 0;
+    cursor: pointer;
+  }
+
+  .cite-card.guideline { cursor: pointer; width: 100%; text-align: left; color: inherit; font: inherit; }
+  .cite-excerpt {
+    font-size: 13px;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  /* Reference material is visually its own thing: not chart data, not the model's words. */
+  .ref-group .group-label { color: var(--ref); }
+
+  .ref-card {
+    border: 1px dashed var(--ref);
+    background: var(--ref-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .ref-card + .ref-card { margin-top: 6px; }
+  .ref-card .ref-title { font-weight: 600; }
+  .ref-card .ref-source { color: var(--ref); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .ref-card p { margin: 4px 0 0; overflow-wrap: anywhere; }
+  .ref-card p.none { color: var(--ink-soft); }
+  .ref-card a { color: var(--ref); }
+
+  details.details {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  details.details summary { cursor: pointer; width: fit-content; }
+  details.details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .details-body {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  .details-body h5 { margin: 8px 0 2px; font-size: 11px; font-weight: 500; color: var(--ink); }
+  .details-body h5:first-child { margin-top: 0; }
+  .details-body ul { margin: 0; padding-left: 16px; }
+  .details-body .failed { color: var(--warn); }
+
+  .feedback-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+
+  .feedback-btn:hover:not(:disabled) { color: var(--ink); filter: none; }
+  .feedback-btn:disabled { opacity: 0.5; }
+  .feedback-btn[aria-pressed="true"] {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .feedback-comment-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: underline;
+  }
+
+  .feedback-comment-toggle:hover { filter: none; color: var(--ink); }
+
+  .feedback-ack {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .feedback-comment-box {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .feedback-comment-box textarea {
+    flex: 1;
+    min-height: 2.4em;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    resize: vertical;
+  }
+
+  .feedback-comment-box textarea::placeholder { color: var(--ink-soft); }
+  .feedback-comment-box textarea:disabled { opacity: 0.6; }
+
+  .typing {
+    display: flex;
+    gap: 4px;
+    padding: 6px 4px;
+  }
+
+  .typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+    animation: pulse 1.2s infinite ease-in-out;
+  }
+
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+  @keyframes pulse {
+    0%, 60%, 100% { opacity: 0.3; transform: scale(0.85); }
+    30% { opacity: 1; transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .typing span { animation: none; opacity: 0.6; }
+  }
+
+  footer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--panel-2);
+    padding: 16px 24px 18px;
+  }
+
+  form {
+    display: flex;
+    gap: 10px;
+    max-width: 688px;
+    margin: 0 auto;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  input[type="text"]:disabled { opacity: 0.6; }
+
+  input[type="text"]:focus-visible,
+  button:focus-visible,
+  a.btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  input[type="text"]::placeholder { color: var(--ink-soft); }
+
+  button, a.btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 22px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  button:hover, a.btn:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  button.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+
+  button.small { padding: 6px 14px; font-size: 12px; }
+
+  /* ---- document upload (composer) -------------------------------------- */
+  .composer-tools {
+    max-width: 688px;
+    margin: 0 auto 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .attach-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .doc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 4px 6px 4px 12px;
+    border: 1px solid var(--cite);
+    background: var(--cite-soft);
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .doc-chip .doc-chip-text { min-width: 0; overflow-wrap: anywhere; }
+  .doc-chip button {
+    background: transparent;
+    color: var(--ink);
+    border: 0;
+    padding: 2px 8px;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .upload-panel {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .upload-fields { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; }
+  .upload-fields label { font-size: 12px; color: var(--ink-soft); }
+  .upload-fields input[type="file"],
+  .upload-fields select {
+    min-width: 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .upload-fields input[type="file"]::file-selector-button {
+    font: inherit;
+    font-weight: 600;
+    margin-right: 10px;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    cursor: pointer;
+  }
+  .upload-fields select:focus-visible,
+  .upload-fields input[type="file"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .upload-hint { margin: 0; font-size: 12px; color: var(--ink-soft); }
+  .upload-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .upload-actions button { padding: 8px 16px; font-size: 13px; }
+  .upload-actions button.ghost { padding: 8px 14px; }
+  .upload-status { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-soft); }
+  .upload-status progress { flex: 0 0 140px; height: 8px; accent-color: var(--accent); }
+  .upload-error {
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--warn);
+    background: var(--warn-soft);
+    border-radius: 8px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .upload-result-empty { font-size: 13px; color: var(--ink-soft); }
+  .cite-field-conf { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--warn); }
+
+  .disclaimer {
+    max-width: 688px;
+    margin: 10px auto 0;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 560px) {
+    header { padding: 14px 16px; }
+    .patient-bar { padding: 12px 16px; }
+    main { padding: 24px 16px; }
+    footer { padding: 14px 16px 16px; }
+    .row { max-width: 100%; }
+    .upload-fields { grid-template-columns: 1fr; }
+    .upload-status progress { flex-basis: 100px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M18 30 L10 30 L6 38 L14 30 Z" fill="#D98E3B"></path>
+      <rect x="2" y="2" width="36" height="28" rx="10" fill="#D98E3B"></rect>
+      <path d="M8 16 L14 16 L17 9 L21 23 L24 16 L32 16" stroke="#14181B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+    </svg>
+    <div class="brand-text">
+      <span class="name">AgentForge</span>
+      <span class="role">Clinical Co-Pilot</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="resident" hidden></span>
+    <button type="button" id="new-convo" class="ghost" hidden>New conversation</button>
+    <span class="badge">Demo data · not for clinical use</span>
+  </div>
+</header>
+
+<section id="patient-bar" class="patient-bar" aria-label="Active patient" hidden></section>
+
+<section id="gate" class="gate" hidden>
+  <p id="gate-msg"></p>
+  <a id="gate-login" class="btn" href="/login?next=/ui" hidden>Log in with OpenEMR</a>
+  <button type="button" id="gate-retry" hidden>Try again</button>
+</section>
+
+<main id="chat-log" aria-live="polite" aria-label="Conversation with the Clinical Co-Pilot" hidden></main>
+
+<div id="citation-modal-root"></div>
+
+<footer id="composer" hidden>
+  <div class="composer-tools">
+    <div class="attach-row">
+      <button type="button" id="attach-btn" class="ghost" aria-expanded="false" aria-controls="upload-panel">＋ Attach document</button>
+      <span id="doc-chip" class="doc-chip" hidden>
+        <span id="doc-chip-text" class="doc-chip-text"></span>
+        <button type="button" id="doc-chip-remove" aria-label="Don’t use the attached document for the next question">✕</button>
+      </span>
+    </div>
+    <section id="upload-panel" class="upload-panel" aria-label="Upload a document" hidden>
+      <div class="upload-fields">
+        <label for="file-input">File</label>
+        <input type="file" id="file-input" accept=".pdf,.png,application/pdf,image/png" />
+        <label for="doctype-select">Document type</label>
+        <select id="doctype-select">
+          <option value="lab_pdf">Lab report</option>
+          <option value="intake_form">Intake form</option>
+        </select>
+      </div>
+      <p class="upload-hint">PDF or PNG, up to 5 pages and 20 MB. Extracted fields are added to the chart as pending review.</p>
+      <div class="upload-actions">
+        <button type="button" id="upload-btn">Upload and read</button>
+        <button type="button" id="upload-cancel" class="ghost">Cancel</button>
+      </div>
+      <div id="upload-status" class="upload-status" role="status" aria-live="polite" hidden>
+        <progress id="upload-progress" max="100"></progress>
+        <span id="upload-status-text"></span>
+      </div>
+      <p id="upload-error" class="upload-error" role="alert" hidden></p>
+    </section>
+  </div>
+  <form id="chat-form">
+    <label for="chat-input" class="sr-only">Message</label>
+    <input id="chat-input" type="text" autocomplete="off" placeholder="Ask about this patient…" />
+    <button type="submit" id="send-btn">Send</button>
+  </form>
+  <p class="disclaimer">Demo data only — not for clinical use.</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // Above the slowest documented droplet p95 (PERFORMANCE_BASELINE.md:
+  // 37s at 10 concurrent residents, 83s at 50). Not a retry policy: on
+  // timeout the request is abandoned and the resident decides whether to
+  // resend. The server may still finish the abandoned turn.
+  const REQUEST_TIMEOUT_MS = 90000;
+
+  // Substituted by GET /ui. Left as the literal placeholder when this file
+  // is opened directly, in which case no demo link is offered.
+  const DEFAULT_PATIENT_ID = '__DEFAULT_PATIENT_ID__';
+
+  const OPENING_MESSAGE =
+    'Ask about this patient’s chart — recent labs, medications, allergies, or how it compares to sign-out.';
+
+  const $ = (id) => document.getElementById(id);
+  const log = $('chat-log');
+  const gate = $('gate');
+  const composer = $('composer');
+  const patientBar = $('patient-bar');
+  const form = $('chat-form');
+  const input = $('chat-input');
+  const sendBtn = $('send-btn');
+  const newConvoBtn = $('new-convo');
+  const attachBtn = $('attach-btn');
+  const uploadPanel = $('upload-panel');
+  const fileInput = $('file-input');
+  const docTypeSelect = $('doctype-select');
+  const uploadBtn = $('upload-btn');
+  const uploadCancel = $('upload-cancel');
+  const uploadStatus = $('upload-status');
+  const uploadProgress = $('upload-progress');
+  const uploadStatusText = $('upload-status-text');
+  const uploadError = $('upload-error');
+  const docChip = $('doc-chip');
+  const docChipText = $('doc-chip-text');
+  const docChipRemove = $('doc-chip-remove');
+  const DEFAULT_PLACEHOLDER = 'Ask about this patient…';
+
+  // epoch increments whenever the conversation is discarded (new
+  // conversation, different patient). Every async continuation compares
+  // against the epoch it started under and drops its result if it changed,
+  // so a slow reply can never land in a conversation about someone else.
+  const state = {
+    epoch: 0,
+    requestedPatient: undefined, // raw ?patient= value last acted on (null = absent)
+    patientId: null,             // canonical ID echoed by /patient; null until verified
+    conversationId: null,
+    busy: false,
+    inflight: null,
+    lastUserText: null,
+    uploading: false,
+    uploadXhr: null,
+    uploadSent: false,           // the file finished sending; the server may still complete an aborted upload
+    pendingDocRef: null          // {doc_id, doc_type} of the document just uploaded; sent with the next question only
+  };
+
+  const AGENT_AVATAR = `
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M3 12h4l2-7 4 14 2-7h6" stroke="#D98E3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+
+  const VERIFIED_ICON = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="#D98E3B"/>
+      <path d="M8 12.5l2.5 2.5L16 9.5" stroke="#14181B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+
+  const WARN_ICON = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M12 3L2 21h20L12 3z" stroke="#E5645A" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M12 10v5M12 18v.5" stroke="#E5645A" stroke-width="2" stroke-linecap="round"/>
+    </svg>`;
+
+  // All text from the server goes in via textContent -- never innerHTML.
+  // innerHTML is used only for the constant SVG strings above.
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  function icon(svg, className) {
+    const span = el('span', className);
+    span.innerHTML = svg;
+    return span;
+  }
+
+  // Minimal, hand-rolled markdown subset (bold, italic, bullet lists) for
+  // the model's response text -- no external dependency (this page has no
+  // build step, deliberately, per GET /ui's own docstring), so no
+  // marked.js/DOMPurify pull-in. Safety is the escape-THEN-format
+  // ordering, not a library: HTML-escape every character first, so any
+  // "<"/">"/"&" from the raw text (which can legitimately be model
+  // output echoing text extracted from an uploaded document -- untrusted
+  // input, not just untrusted formatting) is neutralized into literal
+  // entities before any of the markdown regexes ever run. Every regex
+  // below only recognizes "*"/"_"/"- " -- none of them can turn an
+  // escaped "&lt;" back into a real "<", so there is no path from
+  // document-derived text to an executable tag.
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderMarkdownSafeInline(escaped) {
+    return escaped
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(?<![*\w])\*([^*]+)\*(?!\w)/g, '<em>$1</em>')
+      .replace(/(?<![_\w])_([^_]+)_(?!\w)/g, '<em>$1</em>');
+  }
+
+  function renderMarkdownSafe(text) {
+    const lines = text.split('\n');
+    const htmlParts = [];
+    let listBuffer = [];
+    const flushList = () => {
+      if (!listBuffer.length) return;
+      htmlParts.push('<ul>' + listBuffer.map((li) => '<li>' + renderMarkdownSafeInline(li) + '</li>').join('') + '</ul>');
+      listBuffer = [];
+    };
+    for (const rawLine of lines) {
+      const escapedLine = escapeHtml(rawLine);
+      const bulletMatch = /^\s*[-*]\s+(.*)$/.exec(rawLine);
+      if (bulletMatch) {
+        listBuffer.push(escapeHtml(bulletMatch[1]));
+        continue;
+      }
+      flushList();
+      if (escapedLine.trim()) htmlParts.push('<span class="md-line">' + renderMarkdownSafeInline(escapedLine) + '</span><br>');
+    }
+    flushList();
+    return htmlParts.join('');
+  }
+
+  // Sets element content from raw, untrusted text via the safe escape-
+  // then-format pipeline above -- the one deliberate, narrow exception to
+  // "server text goes in via textContent" (comment above), used only for
+  // the model's own response paragraphs, which are the one place markdown
+  // formatting is actually expected.
+  function setMarkdownContent(node, text) {
+    node.innerHTML = renderMarkdownSafe(text);
+  }
+
+  function scrollToBottom() {
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function stringList(value) {
+    return Array.isArray(value) ? value.filter((v) => typeof v === 'string' && v) : [];
+  }
+
+  function safeHttpUrl(value) {
+    if (typeof value !== 'string') return null;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------- views
+
+  function showGate({ message, login, retry }) {
+    resetConversation();
+    log.hidden = true;
+    composer.hidden = true;
+    patientBar.hidden = true;
+    newConvoBtn.hidden = true;
+    $('resident').hidden = true;
+    $('gate-msg').textContent = message;
+    const loginLink = $('gate-login');
+    loginLink.hidden = !login;
+    // Come back to exactly this page, patient included, after logging in.
+    loginLink.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
+    $('gate-retry').hidden = !retry;
+    gate.hidden = false;
+  }
+
+  function showChat() {
+    gate.hidden = true;
+    log.hidden = false;
+    composer.hidden = false;
+    newConvoBtn.hidden = false;
+  }
+
+  function refreshControls() {
+    const canSend = state.patientId !== null && !state.busy && !state.uploading;
+    input.disabled = !canSend;
+    sendBtn.disabled = !canSend;
+    attachBtn.disabled = state.patientId === null || state.busy;
+    uploadBtn.disabled = state.patientId === null || state.busy || state.uploading;
+    fileInput.disabled = state.uploading;
+    docTypeSelect.disabled = state.uploading;
+  }
+
+  function setBusy(busy) {
+    state.busy = busy;
+    refreshControls();
+  }
+
+  // ------------------------------------------------------------- messages
+
+  function addUserMessage(text) {
+    const row = el('div', 'row user');
+    row.appendChild(el('div', 'bubble user', text));
+    log.appendChild(row);
+    scrollToBottom();
+  }
+
+  function agentRow(bubble, extras) {
+    const row = el('div', 'row agent');
+    row.appendChild(icon(AGENT_AVATAR, 'avatar'));
+    const stack = el('div', 'bubble-stack');
+    stack.appendChild(bubble);
+    (extras || []).forEach((node) => stack.appendChild(node));
+    row.appendChild(stack);
+    log.appendChild(row);
+    scrollToBottom();
+    return row;
+  }
+
+  function addPlainAgentMessage(text) {
+    const bubble = el('div', 'bubble agent');
+    bubble.appendChild(el('p', null, text));
+    return agentRow(bubble);
+  }
+
+  function addErrorMessage(text, onRetry) {
+    const bubble = el('div', 'bubble agent error');
+    bubble.setAttribute('role', 'alert');
+    bubble.appendChild(el('p', null, text));
+    if (onRetry) {
+      const retry = el('button', 'small', 'Retry');
+      retry.type = 'button';
+      retry.style.marginTop = '10px';
+      retry.addEventListener('click', () => {
+        row.remove();
+        onRetry();
+      });
+      bubble.appendChild(retry);
+    }
+    const row = agentRow(bubble);
+    return row;
+  }
+
+  function addTypingIndicator() {
+    const bubble = el('div', 'bubble agent');
+    const typing = el('div', 'typing');
+    typing.setAttribute('role', 'status');
+    typing.setAttribute('aria-label', 'Co-pilot is responding');
+    typing.append(el('span'), el('span'), el('span'));
+    bubble.appendChild(typing);
+    const row = agentRow(bubble);
+    row.id = 'typing-row';
+  }
+
+  function removeTypingIndicator() {
+    const row = $('typing-row');
+    if (row) row.remove();
+  }
+
+  // FHIR resource type -> what a resident would call it.
+  const SOURCE_LABELS = {
+    Condition: 'Condition record',
+    MedicationRequest: 'Medication record',
+    AllergyIntolerance: 'Allergy record',
+    Encounter: 'Encounter record',
+    Observation: 'Observation record',
+    Patient: 'Patient record'
+  };
+
+  function summarizeSources(sourceResources) {
+    const counts = new Map();
+    sourceResources.forEach((ref) => {
+      const type = ref.split('/')[0];
+      counts.set(type, (counts.get(type) || 0) + 1);
+    });
+    return Array.from(counts, ([type, count]) => ({
+      label: SOURCE_LABELS[type] || type + ' record',
+      count
+    }));
+  }
+
+  function buildWarning(turn) {
+    const unverified = !turn.verificationPassed || turn.flaggedClaims.length > 0;
+    const box = el('div', 'warn');
+    box.setAttribute('role', 'note');
+
+    const title = el('div', 'warn-title');
+    title.appendChild(icon(WARN_ICON));
+    title.appendChild(el('span', null, unverified
+      ? 'Not fully verified against the chart — check this before relying on it.'
+      : 'Notes on this response'));
+    box.appendChild(title);
+
+    const addList = (heading, items) => {
+      if (!items.length) return;
+      box.appendChild(el('h4', null, heading));
+      const ul = el('ul');
+      items.forEach((item) => ul.appendChild(el('li', null, item)));
+      box.appendChild(ul);
+    };
+    addList('Flagged claims', turn.flaggedClaims);
+    addList('Warnings', turn.enforcedWarnings);
+    return box;
+  }
+
+  // Uploaded-document facts are shown only as the citation cards below
+  // ("document:<id>#field" refs are not chart records and never become chips).
+  function chartRefs(sourceResources) {
+    return sourceResources.filter((ref) => !ref.startsWith('document:'));
+  }
+
+  // Structured chart records only, each with a readable label the server built
+  // from the record itself ("Allergy: Sulfa drugs", "Condition: COPD"). The
+  // type-count chips ("Condition record ×2") are only a fallback for a response
+  // that carries no labelled chart citations at all.
+  function buildSourceGroup(turn) {
+    const labels = [];
+    const seen = new Set();
+    let anyChartCitation = false;
+    turn.citations.forEach((c) => {
+      if (c.sourceType !== 'fhir_resource') return;
+      anyChartCitation = true;
+      if (!c.fieldLabel || seen.has(c.fieldLabel)) return;
+      seen.add(c.fieldLabel);
+      labels.push(c.fieldLabel);
+    });
+    if (!labels.length && !anyChartCitation) {
+      summarizeSources(chartRefs(turn.sourceResources)).forEach((s) => labels.push(s.count > 1 ? `${s.label} ×${s.count}` : s.label));
+    }
+    if (!labels.length) return null;
+    const group = el('div', 'group');
+    group.appendChild(el('div', 'group-label', 'From this patient’s chart'));
+    const chips = el('div', 'chips');
+    labels.forEach((label) => chips.appendChild(el('span', 'chip', label)));
+    group.appendChild(chips);
+    return group;
+  }
+
+  // Expected outcomes (not failures): a neutral chip plus the plain sentence. Never a warning box, and it does
+  // not take the verified check away -- see app/graph/notices.py.
+  function buildNoticeGroup(turn) {
+    if (!turn.notices.length) return null;
+    const group = el('div', 'group notice-group');
+    turn.notices.forEach((notice) => {
+      const row = el('div', 'notice-row');
+      row.setAttribute('role', 'note');
+      row.appendChild(el('span', 'chip notice' + (notice.severity === 'warning' ? ' warning' : ''), notice.label));
+      row.appendChild(el('span', 'notice-text', notice.text));
+      group.appendChild(row);
+    });
+    return group;
+  }
+
+  function buildReferenceGroup(notes) {
+    if (!notes.length) return null;
+    const group = el('div', 'group ref-group');
+    group.appendChild(el('div', 'group-label', 'Reference material — not from this chart, not the co-pilot’s own words'));
+    const list = el('div');
+    notes.forEach((note) => {
+      const card = el('div', 'ref-card');
+      const head = el('div');
+      head.appendChild(el('span', 'ref-title', note.subjectName + ' '));
+      head.appendChild(el('span', 'ref-source', note.source));
+      card.appendChild(head);
+      card.appendChild(note.noteText
+        ? el('p', null, note.noteText)
+        : el('p', 'none', 'No reference note is available for this item.'));
+      const href = safeHttpUrl(note.sourceUrl);
+      if (href) {
+        const p = el('p');
+        const a = el('a', null, 'View source');
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        p.appendChild(a);
+        card.appendChild(p);
+      }
+      list.appendChild(card);
+    });
+    group.appendChild(list);
+    return group;
+  }
+
+  // ---------------------------------------------------- citation modal
+
+  // Same epoch guard the rest of the app uses -- a slow preview fetch for
+  // a citation from a conversation the resident has since left must never
+  // land in a modal about a different patient.
+  function currentModalEpoch() { return state.epoch; }
+
+  function closeCitationModal() {
+    $('citation-modal-root').replaceChildren();
+    document.removeEventListener('keydown', onModalKeydown);
+  }
+
+  function onModalKeydown(e) {
+    if (e.key === 'Escape') closeCitationModal();
+  }
+
+  function openCitationModal(citation) {
+    const epoch = currentModalEpoch();
+    const root = $('citation-modal-root');
+    root.replaceChildren();
+
+    const backdrop = el('div', 'citation-modal-backdrop');
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeCitationModal(); });
+
+    const modal = el('div', 'citation-modal');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+
+    const header = el('div', 'citation-modal-header');
+    const titleWrap = el('div');
+    const isDoc = citation.sourceType === 'uploaded_document';
+    titleWrap.appendChild(el('div', 'citation-modal-title', isDoc ? documentTitle(citation) : guidelineTitle(citation)));
+    const subtitleParts = [];
+    if (isDoc && citation.fieldLabel) subtitleParts.push(citation.fieldLabel + (citation.quoteOrValue ? ': ' + citation.quoteOrValue : ''));
+    if (isDoc && isNumericPage(citation.pageOrSection)) subtitleParts.push('page ' + citation.pageOrSection);
+    if (!isDoc) {
+      subtitleParts.push('Guideline evidence');
+      const passages = citation.passages || [citation];
+      subtitleParts.push(passages.length + (passages.length === 1 ? ' passage cited' : ' passages cited'));
+    }
+    if (subtitleParts.length) titleWrap.appendChild(el('div', 'citation-modal-subtitle', subtitleParts.join(' · ')));
+    header.appendChild(titleWrap);
+    const closeBtn = el('button', 'citation-modal-close', '✕');
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.addEventListener('click', closeCitationModal);
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    if (isDoc) {
+      const status = el('div', 'citation-status', 'Loading preview…');
+      status.setAttribute('role', 'status');
+      modal.appendChild(status);
+      loadDocumentPreview(citation, modal, status, epoch);
+    } else {
+      // Guideline evidence: text-only, no image exists for these (PRD
+      // Section 4.8). Every cited passage of the document, each under its
+      // section heading. Passage text is document-derived, so it goes through
+      // the escape-then-format renderer (setMarkdownContent), never raw HTML.
+      const list = el('div', 'cite-passages');
+      // In document order (chunk index), not retrieval-rank order, so the
+      // passages read top to bottom the way they appear in the guideline.
+      const chunkIndex = (c) => { const m = /:(\d+)$/.exec(c.fieldOrChunkId || ''); return m ? parseInt(m[1], 10) : 0; };
+      (citation.passages || [citation]).slice().sort((a, b) => chunkIndex(a) - chunkIndex(b)).forEach((p) => {
+        const item = el('div', 'cite-passage');
+        if (p.pageOrSection && p.pageOrSection !== '(preamble)') item.appendChild(el('div', 'cite-passage-heading', p.pageOrSection));
+        const body = el('div', 'cite-passage-body');
+        setMarkdownContent(body, p.displayText || p.quoteOrValue || 'No excerpt available.');
+        item.appendChild(body);
+        list.appendChild(item);
+      });
+      modal.appendChild(list);
+      modal.appendChild(el('div', 'citation-status', 'Source: ' + guidelineTitle(citation)));
+    }
+
+    backdrop.appendChild(modal);
+    root.appendChild(backdrop);
+    document.addEventListener('keydown', onModalKeydown);
+    closeBtn.focus();
+  }
+
+  // page_or_section is "page unknown" when a stored fact has no page number; that is not a page,
+  // so it is never sent to /documents/preview.
+  function isNumericPage(value) {
+    return typeof value === 'string' && /^[1-9][0-9]*$/.test(value);
+  }
+
+  async function loadDocumentPreview(citation, modal, status, epoch) {
+    if (!isNumericPage(citation.pageOrSection)) {
+      status.textContent = 'No preview: this field has no known page.';
+      return;
+    }
+    const params = new URLSearchParams({
+      patient_id: state.patientId || '',
+      doc_id: citation.sourceId,
+      page: citation.pageOrSection
+    });
+    if (citation.quoteOrValue) params.set('quote', citation.quoteOrValue);
+
+    let res;
+    try {
+      res = await fetch('/documents/preview?' + params.toString(), { credentials: 'same-origin' });
+    } catch (err) {
+      if (epoch === currentModalEpoch()) status.textContent = 'Could not reach the server to load this preview.';
+      return;
+    }
+    if (epoch !== currentModalEpoch()) return;
+
+    if (res.status === 401) {
+      status.textContent = 'Your session has ended — log in again to view this document.';
+      return;
+    }
+    if (!res.ok) {
+      status.textContent = 'This document preview is not available right now.';
+      return;
+    }
+
+    const blob = await res.blob();
+    if (epoch !== currentModalEpoch()) return;
+    const objectUrl = URL.createObjectURL(blob);
+
+    status.remove();
+    const wrap = el('div', 'citation-preview-wrap');
+    const img = document.createElement('img');
+    img.addEventListener('load', () => URL.revokeObjectURL(objectUrl));
+    img.src = objectUrl;
+    img.alt = 'Preview of ' + (citation.docLabel || 'uploaded document');
+    wrap.appendChild(img);
+
+    const bboxHeader = res.headers.get('X-Citation-Bbox');
+    if (bboxHeader) {
+      const parts = bboxHeader.split(',').map(Number);
+      if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+        const [x0, y0, x1, y1] = parts;
+        const highlight = el('div', 'citation-highlight');
+        highlight.style.left = (x0 * 100) + '%';
+        highlight.style.top = (y0 * 100) + '%';
+        highlight.style.width = ((x1 - x0) * 100) + '%';
+        highlight.style.height = ((y1 - y0) * 100) + '%';
+        wrap.appendChild(highlight);
+      }
+    }
+    modal.appendChild(wrap);
+  }
+
+  // Domain-facing labels for the two NEW citation source types this phase
+  // adds -- fhir_resource citations stay on the existing, non-clickable
+  // buildSourceGroup chips (unchanged Week 1 UI), so this group only ever
+  // shows uploaded_document/guideline entries.
+  // Field-path leaf -> plain-English descriptor, for the later-turn
+  // get_uploaded_documents citation path, whose fieldOrChunkId is a real
+  // field path (e.g. "results[0].value"), unlike the same-turn path's
+  // (a quote snippet -- left as-is, already readable).
+  const _FIELD_NAME_LABELS = {
+    test_name: 'lab test name', value: 'lab value', unit: 'unit', reference_range: 'reference range',
+    collection_date: 'collection date', abnormal_flag: 'abnormal flag',
+    name: 'name', date_of_birth: 'date of birth', sex: 'sex', chief_concern: 'chief concern'
+  };
+
+  function humanizeFieldPath(fieldPath) {
+    if (/^current_medications/.test(fieldPath)) return 'medication';
+    if (/^allergies/.test(fieldPath)) return 'allergy';
+    if (/^family_history/.test(fieldPath)) return 'family history';
+    const leaf = fieldPath.split(/[.[]/).pop().replace(']', '');
+    return _FIELD_NAME_LABELS[leaf] || leaf.replace(/_/g, ' ');
+  }
+
+  // Card titles. All values here are server/document-derived, so every
+  // consumer puts them in via el()/textContent, never innerHTML.
+  function documentTitle(citation) {
+    const label = citation.docLabel || 'Uploaded document';
+    return label + (citation.uploadedOn ? ' · uploaded ' + citation.uploadedOn : '') + ' · pending review';
+  }
+
+  // The guideline's own title (its "# " heading, sent as doc_label); the file
+  // name only if a response predates that field.
+  function guidelineTitle(citation) {
+    if (citation.docLabel) return citation.docLabel;
+    const name = citation.sourceId.replace(/_/g, ' ');
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  function fieldLabelFor(citation) {
+    if (citation.fieldLabel) return citation.fieldLabel;
+    const raw = citation.fieldOrChunkId;
+    if (raw && /[.[]/.test(raw)) return humanizeFieldPath(raw);
+    return 'Cited value';
+  }
+
+  // Blurred-thumbnail fetches, keyed by patient+document+page and cleared
+  // whenever the conversation is discarded (resetConversation), so a
+  // previous patient's page images never outlive the chart they belong to.
+  // Loaded only through the authenticated /documents/preview endpoint --
+  // never a static URL. No `quote` param: that would run server-side OCR
+  // just to draw a thumbnail.
+  const thumbCache = new Map();
+
+  function loadThumbnail(sourceId, page, thumbEl) {
+    const epoch = state.epoch;
+    const key = (state.patientId || '') + '|' + sourceId + '|' + page;
+    let pending = thumbCache.get(key);
+    if (!pending) {
+      const params = new URLSearchParams({ patient_id: state.patientId || '', doc_id: sourceId, page: String(page) });
+      pending = fetch('/documents/preview?' + params.toString(), { credentials: 'same-origin' })
+        .then((res) => (res.ok ? res.blob() : null))
+        .catch(() => null);
+      thumbCache.set(key, pending);
+    }
+    pending.then((blob) => {
+      if (epoch !== state.epoch) return;
+      if (!blob) {
+        thumbCache.delete(key);
+        thumbEl.textContent = 'No preview';
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const img = document.createElement('img');
+      img.alt = '';
+      img.addEventListener('load', () => URL.revokeObjectURL(url));
+      img.src = url;
+      thumbEl.replaceChildren(img);
+    });
+  }
+
+  const VISIBLE_FIELDS = 4;
+
+  function buildDocumentCard(sourceId, citations) {
+    const first = citations[0];
+    const pages = citations.map((c) => parseInt(c.pageOrSection, 10)).filter((n) => Number.isFinite(n) && n > 0);
+    // No known page anywhere on this card: no thumbnail, and the modal says so, rather than a fake page 1.
+    const firstPage = pages.length ? Math.min(...pages) : null;
+    const pageCitation = Object.assign({}, first, {
+      pageOrSection: firstPage === null ? 'page unknown' : String(firstPage), quoteOrValue: '', fieldLabel: null, fieldOrChunkId: null
+    });
+
+    const card = el('div', 'cite-card');
+
+    const main = el('button', 'cite-card-main');
+    main.type = 'button';
+    main.setAttribute('aria-label', 'Open source page: ' + documentTitle(first));
+    main.addEventListener('click', () => openCitationModal(pageCitation));
+    const thumb = el('div', 'cite-thumb', 'Loading…');
+    main.appendChild(thumb);
+    const meta = el('div', 'cite-meta');
+    meta.appendChild(el('div', 'cite-title', (first.docLabel || 'Uploaded document') + (first.uploadedOn ? ' · uploaded ' + first.uploadedOn : '')));
+    meta.appendChild(el('span', 'cite-badge', 'Pending review'));
+    // Identical uploads of the same page collapse into this one card; say how many.
+    const copies = Math.max(...citations.map((c) => c.duplicateCount || 0));
+    if (copies > 1) {
+      const dup = el('span', 'cite-badge dup', 'uploaded ' + copies + '×');
+      dup.title = copies + ' stored documents have exactly this content; shown once';
+      meta.appendChild(dup);
+    }
+    meta.appendChild(el('div', 'cite-sub', 'Click for the page image'));
+    main.appendChild(meta);
+    card.appendChild(main);
+    if (firstPage !== null) loadThumbnail(sourceId, firstPage, thumb);
+
+    const seen = new Set();
+    const fields = citations.filter((c) => {
+      const key = fieldLabelFor(c) + '\u0000' + c.quoteOrValue;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (fields.length) {
+      const list = el('ul', 'cite-fields');
+      const items = fields.map((c, i) => {
+        const li = el('li');
+        const btn = el('button', 'cite-field');
+        btn.type = 'button';
+        btn.title = 'Show where this value appears on the page';
+        btn.appendChild(el('span', 'cite-field-label', fieldLabelFor(c)));
+        btn.appendChild(el('span', 'cite-field-value', c.quoteOrValue));
+        btn.addEventListener('click', () => openCitationModal(c));
+        li.appendChild(btn);
+        li.hidden = i >= VISIBLE_FIELDS;
+        list.appendChild(li);
+        return li;
+      });
+      card.appendChild(list);
+      if (items.length > VISIBLE_FIELDS) {
+        const more = el('button', 'cite-more', 'Show ' + (items.length - VISIBLE_FIELDS) + ' more fields');
+        more.type = 'button';
+        more.setAttribute('aria-expanded', 'false');
+        more.addEventListener('click', () => {
+          const expanded = more.getAttribute('aria-expanded') === 'true';
+          items.forEach((li, i) => { li.hidden = expanded && i >= VISIBLE_FIELDS; });
+          more.setAttribute('aria-expanded', String(!expanded));
+          more.textContent = expanded ? 'Show ' + (items.length - VISIBLE_FIELDS) + ' more fields' : 'Show fewer fields';
+        });
+        card.appendChild(more);
+      }
+    }
+    return card;
+  }
+
+  // Guideline evidence stays text-only (no page image exists for it, PRD
+  // Section 4.8): the card shows a short excerpt; the modal shows the full
+  // retrieved passage and its source.
+  // One card per guideline DOCUMENT, however many of its passages were cited.
+  // The preview is the server's plain-text excerpt of the first passage
+  // (markdown removed, no cut-off word); the modal lists every cited passage.
+  function buildGuidelineCard(sourceId, citations) {
+    const first = citations[0];
+    const group = { sourceType: 'guideline', sourceId, docLabel: first.docLabel, passages: citations };
+    const card = el('button', 'cite-card guideline');
+    card.type = 'button';
+    card.setAttribute('aria-label', 'Open guideline passages: ' + guidelineTitle(first));
+    card.appendChild(el('div', 'cite-title', guidelineTitle(first)));
+    card.appendChild(el('div', 'cite-excerpt', first.excerpt || first.displayText || first.quoteOrValue || 'No excerpt available.'));
+    const n = citations.length;
+    card.appendChild(el('div', 'cite-sub', 'Guideline evidence · ' + n + (n === 1 ? ' passage' : ' passages') + ' cited · click to read'));
+    card.addEventListener('click', () => openCitationModal(group));
+    return card;
+  }
+
+  function buildOneCitationGroup(label, cards) {
+    if (!cards.length) return null;
+    const group = el('div', 'group cite-group');
+    group.appendChild(el('div', 'group-label', label));
+    const wrap = el('div', 'cite-cards');
+    cards.forEach((card) => wrap.appendChild(card));
+    group.appendChild(wrap);
+    return group;
+  }
+
+  // One card per source document (citations grouped by source_id, first-
+  // seen order), and one text card per guideline passage -- distinct from
+  // the plain, non-clickable chart-fact chips (buildSourceGroup, fed by an
+  // entirely different field, source_resources).
+  function buildCitationsGroups(citations) {
+    const byDoc = new Map();
+    citations.filter((c) => c.sourceType === 'uploaded_document').forEach((c) => {
+      if (!byDoc.has(c.sourceId)) byDoc.set(c.sourceId, []);
+      byDoc.get(c.sourceId).push(c);
+    });
+    const docCards = Array.from(byDoc, ([sourceId, cites]) => buildDocumentCard(sourceId, cites));
+    const byGuideline = new Map();
+    citations.filter((c) => c.sourceType === 'guideline').forEach((c) => {
+      if (!byGuideline.has(c.sourceId)) byGuideline.set(c.sourceId, []);
+      byGuideline.get(c.sourceId).push(c);
+    });
+    const guidelineCards = Array.from(byGuideline, ([sourceId, cites]) => buildGuidelineCard(sourceId, cites));
+    return [
+      buildOneCitationGroup('Uploaded documents — click a card for the page, a field for where it appears', docCards),
+      buildOneCitationGroup('Guideline evidence — click to read the cited passages', guidelineCards)
+    ].filter(Boolean);
+  }
+
+  // Qualitative resident feedback on one turn's response -- never affects
+  // the response itself, purely a side-channel POST to /feedback (KEY_METRICS.md:
+  // logged as supplementary signal, never folded into verification pass rate).
+  // Only offered on real graded turns (addAgentMessage), never the opening
+  // placeholder message.
+  function buildFeedbackRow(turn) {
+    const wrap = el('div', 'group');
+    const row = el('div', 'feedback-row');
+    const ack = el('span', 'feedback-ack');
+    ack.setAttribute('role', 'status');
+    ack.setAttribute('aria-live', 'polite');
+
+    const upBtn = el('button', 'feedback-btn', '👍');
+    upBtn.type = 'button';
+    upBtn.setAttribute('aria-label', 'Mark this response helpful');
+    upBtn.setAttribute('aria-pressed', 'false');
+
+    const downBtn = el('button', 'feedback-btn', '👎');
+    downBtn.type = 'button';
+    downBtn.setAttribute('aria-label', 'Mark this response not helpful');
+    downBtn.setAttribute('aria-pressed', 'false');
+
+    const commentToggle = el('button', 'feedback-comment-toggle', 'Add a comment');
+    commentToggle.type = 'button';
+    commentToggle.setAttribute('aria-expanded', 'false');
+
+    const commentBox = el('div', 'feedback-comment-box');
+    commentBox.hidden = true;
+    const textarea = document.createElement('textarea');
+    textarea.setAttribute('aria-label', 'Feedback comment');
+    textarea.placeholder = 'Optional — what was wrong or right about this response?';
+    const commentSubmit = el('button', 'small', 'Send');
+    commentSubmit.type = 'button';
+    commentBox.appendChild(textarea);
+    commentBox.appendChild(commentSubmit);
+
+    let lastRating = null;
+
+    async function postFeedback(rating, comment) {
+      try {
+        const res = await fetch('/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            correlation_id: turn.correlationId,
+            rating,
+            comment: comment || null,
+            patient_id: state.patientId
+          })
+        });
+        if (res.status === 401) return { ok: false, reason: 'unauthenticated' };
+        if (!res.ok) return { ok: false, reason: 'error' };
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, reason: 'network' };
+      }
+    }
+
+    function failureMessage(reason, fallback) {
+      return reason === 'unauthenticated'
+        ? 'Your session has ended — log in again to submit feedback.'
+        : fallback;
+    }
+
+    async function handleThumbClick(rating, clickedBtn, otherBtn) {
+      if (!turn.correlationId) {
+        ack.textContent = "Couldn't record feedback for this response.";
+        return;
+      }
+      clickedBtn.disabled = true;
+      otherBtn.disabled = true;
+      const result = await postFeedback(rating, null);
+      if (result.ok) {
+        lastRating = rating;
+        clickedBtn.setAttribute('aria-pressed', 'true');
+        ack.textContent = 'Thanks — recorded.';
+      } else {
+        clickedBtn.disabled = false;
+        otherBtn.disabled = false;
+        ack.textContent = failureMessage(result.reason, "Couldn't record feedback — try again.");
+      }
+    }
+
+    upBtn.addEventListener('click', () => handleThumbClick('up', upBtn, downBtn));
+    downBtn.addEventListener('click', () => handleThumbClick('down', downBtn, upBtn));
+
+    commentToggle.addEventListener('click', () => {
+      const expanded = commentToggle.getAttribute('aria-expanded') === 'true';
+      commentToggle.setAttribute('aria-expanded', String(!expanded));
+      commentBox.hidden = expanded;
+      if (!expanded) textarea.focus();
+    });
+
+    commentSubmit.addEventListener('click', async () => {
+      const comment = textarea.value.trim();
+      if (!comment) return;
+      if (!lastRating) {
+        ack.textContent = 'Pick 👍 or 👎 before adding a comment.';
+        return;
+      }
+      commentSubmit.disabled = true;
+      const result = await postFeedback(lastRating, comment);
+      if (result.ok) {
+        textarea.disabled = true;
+        ack.textContent = 'Thanks — comment recorded.';
+      } else {
+        commentSubmit.disabled = false;
+        ack.textContent = failureMessage(result.reason, "Couldn't record comment — try again.");
+      }
+    });
+
+    row.appendChild(upBtn);
+    row.appendChild(downBtn);
+    row.appendChild(commentToggle);
+    row.appendChild(ack);
+    wrap.appendChild(row);
+    wrap.appendChild(commentBox);
+    return wrap;
+  }
+
+  function buildDetails(turn) {
+    const details = el('details', 'details');
+    details.appendChild(el('summary', null, 'Details'));
+    const body = el('div', 'details-body');
+
+    body.appendChild(el('h5', null, 'Correlation ID'));
+    body.appendChild(el('div', null, turn.correlationId || 'unavailable'));
+
+    body.appendChild(el('h5', null, 'Tool calls this turn'));
+    if (turn.toolCalls.length) {
+      const ul = el('ul');
+      turn.toolCalls.forEach((call) => {
+        const latency = typeof call.latency_s === 'number' ? ` · ${call.latency_s}s` : '';
+        ul.appendChild(el('li', call.failed ? 'failed' : null,
+          `${call.tool || 'unknown'}${latency}${call.failed ? ' · FAILED' : ''}`));
+      });
+      body.appendChild(ul);
+    } else {
+      body.appendChild(el('div', null, 'None (answered from earlier in this conversation).'));
+    }
+
+    if (chartRefs(turn.sourceResources).length) {
+      body.appendChild(el('h5', null, 'Chart source records'));
+      const ul = el('ul');
+      chartRefs(turn.sourceResources).forEach((ref) => ul.appendChild(el('li', null, ref)));
+      body.appendChild(ul);
+    }
+
+    details.appendChild(body);
+    return details;
+  }
+
+  // turn: normalized output of parseChatResponse().
+  function addAgentMessage(turn) {
+    // A warning-level notice (e.g. "Assistant unavailable") means the turn produced no answer: never show the
+    // verified check on it, but there is also nothing to list in the verification warning box.
+    const hasWarningNotice = turn.notices.some((n) => n.severity === 'warning');
+    const hasVerificationIssue = !turn.verificationPassed
+      || turn.flaggedClaims.length > 0
+      || turn.enforcedWarnings.length > 0;
+    const clean = !hasVerificationIssue && !hasWarningNotice;
+
+    const bubble = el('div', 'bubble agent');
+    if (hasVerificationIssue) bubble.appendChild(buildWarning(turn));
+
+    const paragraphs = turn.response.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    if (!paragraphs.length) paragraphs.push('The Co-Pilot returned an empty response.');
+    paragraphs.forEach((text, i) => {
+      const p = el('p', null);
+      setMarkdownContent(p, text);
+      if (i === 0 && clean) {
+        const line = el('div', 'verified-line');
+        line.appendChild(icon(VERIFIED_ICON));
+        line.appendChild(p);
+        bubble.appendChild(line);
+      } else {
+        bubble.appendChild(p);
+      }
+    });
+
+    const extras = [
+      buildSourceGroup(turn),
+      ...buildCitationsGroups(turn.citations),
+      buildNoticeGroup(turn),
+      buildReferenceGroup(turn.referenceNotes),
+      buildFeedbackRow(turn),
+      buildDetails(turn)
+    ].filter(Boolean);
+    agentRow(bubble, extras);
+  }
+
+  // ------------------------------------------------------ /chat response
+
+  function parseChatResponse(data) {
+    if (!data || typeof data !== 'object' || typeof data.response !== 'string') {
+      throw new Error('malformed /chat response');
+    }
+    return {
+      conversationId: typeof data.conversation_id === 'string' ? data.conversation_id : null,
+      correlationId: typeof data.correlation_id === 'string' ? data.correlation_id : '',
+      response: data.response,
+      // Absent or non-boolean counts as NOT verified: never show the check on a guess.
+      verificationPassed: data.verification_passed === true,
+      flaggedClaims: stringList(data.flagged_claims),
+      enforcedWarnings: stringList(data.enforced_warnings),
+      sourceResources: stringList(data.source_resources),
+      // Structured notices (app/graph/notices.py): expected outcomes stated plainly, e.g. no matching guideline.
+      notices: Array.isArray(data.notices)
+        ? data.notices
+            .filter((n) => n && typeof n === 'object' && typeof n.text === 'string' && n.text)
+            .map((n) => ({
+              kind: typeof n.kind === 'string' ? n.kind : '',
+              severity: n.severity === 'warning' ? 'warning' : 'info',
+              label: typeof n.label === 'string' && n.label ? n.label : 'Note',
+              text: n.text
+            }))
+        : [],
+      toolCalls: Array.isArray(data.tool_calls)
+        ? data.tool_calls.filter((c) => c && typeof c === 'object')
+        : [],
+      referenceNotes: Array.isArray(data.reference_notes)
+        ? data.reference_notes
+            .filter((n) => n && typeof n === 'object' && typeof n.subject_name === 'string')
+            .map((n) => ({
+              subjectName: n.subject_name,
+              source: typeof n.source === 'string' ? n.source : '',
+              noteText: typeof n.note_text === 'string' && n.note_text ? n.note_text : null,
+              sourceUrl: n.source_url
+            }))
+        : [],
+      // Checklist item 7: app/graph/citations.py's canonical Citation
+      // shape -- {source_type, source_id, page_or_section,
+      // field_or_chunk_id, quote_or_value}.
+      citations: Array.isArray(data.citations)
+        ? data.citations
+            .filter((c) => c && typeof c === 'object' && typeof c.source_type === 'string' && typeof c.source_id === 'string')
+            .map((c) => ({
+              sourceType: c.source_type,
+              sourceId: c.source_id,
+              pageOrSection: typeof c.page_or_section === 'string' ? c.page_or_section : null,
+              fieldOrChunkId: typeof c.field_or_chunk_id === 'string' ? c.field_or_chunk_id : null,
+              quoteOrValue: typeof c.quote_or_value === 'string' ? c.quote_or_value : '',
+              docLabel: typeof c.doc_label === 'string' ? c.doc_label : null,
+              uploadedOn: typeof c.uploaded_on === 'string' ? c.uploaded_on : null,
+              fieldLabel: typeof c.field_label === 'string' ? c.field_label : null,
+              duplicateCount: Number.isInteger(c.duplicate_count) && c.duplicate_count > 1 ? c.duplicate_count : null,
+              excerpt: typeof c.excerpt === 'string' ? c.excerpt : null,
+              displayText: typeof c.display_text === 'string' ? c.display_text : null
+            }))
+        : []
+    };
+  }
+
+  // ------------------------------------------------------- document upload
+
+  const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;  // the server's own cap (app/main.py _MAX_DOCUMENT_UPLOAD_BYTES)
+  const MAX_UPLOAD_PAGES = 5;                 // enforced server-side (too_many_pages); a PDF's pages can't be counted here
+  // OCR + LLM structuring is slow: longer than a chat turn. On timeout the request is abandoned; the server may
+  // still finish it, which the message says.
+  const UPLOAD_TIMEOUT_MS = 180000;
+  const DOC_TYPE_LABELS = { lab_pdf: 'Lab report', intake_form: 'Intake form' };
+  const UPLOAD_ERROR_TEXT = {
+    too_many_pages: 'That document has more than ' + MAX_UPLOAD_PAGES + ' pages. Upload up to ' + MAX_UPLOAD_PAGES +
+      ' pages: split it, or send only the pages that matter.',
+    invalid_file_type: 'Only PDF or PNG files can be read.',
+    empty_file: 'That file is empty.',
+    duplicate: 'This exact document is already on this patient’s chart, so it was not added again.',
+    ocr_failed: 'The text on this document couldn’t be read. Try a clearer scan.',
+    structuring_failed: 'The document’s contents couldn’t be turned into fields. Try again, and check that the document type is right.',
+    structuring_truncated: 'This document is too dense to read in one pass. Try uploading fewer pages.',
+    storage_failed: 'The document couldn’t be saved to the chart. Try again in a moment.'
+  };
+  const CONFIDENCE_RANK = { high: 0, low: 1, unreadable: 2 };
+  const CONFIDENCE_NOTE = { low: 'low confidence', unreadable: 'unreadable' };
+
+  function setUploadError(text) {
+    uploadError.textContent = text || '';
+    uploadError.hidden = !text;
+  }
+
+  // fraction: 0..1 for a determinate bar, null for the indeterminate "server is working" phase.
+  function setUploadStatus(text, fraction) {
+    uploadStatus.hidden = !text;
+    uploadStatusText.textContent = text || '';
+    if (fraction === null || fraction === undefined) uploadProgress.removeAttribute('value');
+    else uploadProgress.value = Math.round(fraction * 100);
+  }
+
+  function openUploadPanel() {
+    uploadPanel.hidden = false;
+    attachBtn.setAttribute('aria-expanded', 'true');
+    fileInput.focus();
+  }
+
+  function closeUploadPanel() {
+    uploadPanel.hidden = true;
+    attachBtn.setAttribute('aria-expanded', 'false');
+    fileInput.value = '';
+    setUploadError('');
+    setUploadStatus('');
+  }
+
+  function abortUpload() {
+    const xhr = state.uploadXhr;
+    state.uploadXhr = null;
+    state.uploading = false;
+    if (xhr) xhr.abort();
+  }
+
+  // Conversation discarded (new conversation, other patient, logged out): nothing about a half-finished upload or
+  // a document waiting for its question may leak into the next one.
+  function resetUploadUi() {
+    abortUpload();
+    state.uploadSent = false;
+    closeUploadPanel();
+    clearPendingDocument();
+  }
+
+  function setPendingDocument(result, filename) {
+    state.pendingDocRef = { doc_id: result.docId, doc_type: result.docType };
+    docChipText.textContent = 'Using ' + DOC_TYPE_LABELS[result.docType].toLowerCase() + ' “' + filename + '” for your next question';
+    docChip.hidden = false;
+    input.placeholder = 'Ask about the uploaded document…';
+  }
+
+  function clearPendingDocument() {
+    state.pendingDocRef = null;
+    docChip.hidden = true;
+    docChipText.textContent = '';
+    input.placeholder = DEFAULT_PLACEHOLDER;
+  }
+
+  function validateUploadFile(file) {
+    if (!file) return 'Choose a PDF or PNG file first.';
+    const name = file.name.toLowerCase();
+    const okType = file.type === 'application/pdf' || file.type === 'image/png' || name.endsWith('.pdf') || name.endsWith('.png');
+    if (!okType) return UPLOAD_ERROR_TEXT.invalid_file_type;
+    if (file.size === 0) return UPLOAD_ERROR_TEXT.empty_file;
+    if (file.size > MAX_UPLOAD_BYTES) return 'That file is larger than 20 MB.';
+    return null;
+  }
+
+  // ---- reading the server's ExtractionResult. Every value here is OCR output from an untrusted document: it is
+  // only ever placed with textContent (el()), never innerHTML. Anything malformed is dropped or treated with
+  // caution (an unknown confidence tier counts as "low"), never trusted.
+
+  function asExtractedField(f) {
+    if (!f || typeof f !== 'object' || typeof f.value !== 'string') return null;
+    const c = f.citation && typeof f.citation === 'object' ? f.citation : {};
+    return {
+      value: f.value,
+      confidence: Object.prototype.hasOwnProperty.call(CONFIDENCE_RANK, f.confidence) ? f.confidence : 'low',
+      page: Number.isInteger(c.page_number) && c.page_number > 0 ? c.page_number : 1,
+      quote: typeof c.quote_or_value === 'string' ? c.quote_or_value : f.value
+    };
+  }
+
+  function worstConfidence(fields) {
+    return fields.reduce((worst, f) => (CONFIDENCE_RANK[f.confidence] > CONFIDENCE_RANK[worst] ? f.confidence : worst), 'high');
+  }
+
+  function extractionRows(docType, extraction) {
+    const rows = [];
+    const push = (label, text, fields, cite, path) => {
+      if (!cite) return;
+      rows.push({ label, text, confidence: worstConfidence(fields), page: cite.page, quote: cite.quote, path });
+    };
+    // A field with no text and no "unreadable" tier carries nothing worth a row.
+    const usable = (f) => f !== null && (f.value.trim() !== '' || f.confidence === 'unreadable');
+    const plain = (f) => (f.value.trim() !== '' ? f.value : '(unreadable)');
+
+    if (docType === 'lab_pdf') {
+      (Array.isArray(extraction.results) ? extraction.results : []).forEach((r, i) => {
+        if (!r || typeof r !== 'object') return;
+        const f = {
+          name: asExtractedField(r.test_name), value: asExtractedField(r.value), unit: asExtractedField(r.unit),
+          range: asExtractedField(r.reference_range), flag: asExtractedField(r.abnormal_flag)
+        };
+        if (!usable(f.value)) return;
+        const parts = [plain(f.value)];
+        if (usable(f.unit) && f.unit.value.trim()) parts[0] += ' ' + f.unit.value;
+        if (usable(f.range) && f.range.value.trim()) parts.push('ref ' + f.range.value);
+        if (usable(f.flag) && f.flag.value.trim()) parts.push(f.flag.value);
+        push(usable(f.name) ? plain(f.name) : 'Lab result', parts.join(' · '), Object.values(f).filter(Boolean), f.value, 'results[' + i + '].value');
+      });
+      return rows;
+    }
+
+    const demo = extraction.demographics && typeof extraction.demographics === 'object' ? extraction.demographics : {};
+    [['Name', demo.name, 'demographics.name'], ['Date of birth', demo.date_of_birth, 'demographics.date_of_birth'],
+     ['Sex', demo.sex, 'demographics.sex'], ['Chief concern', extraction.chief_concern, 'chief_concern']].forEach(([label, raw, path]) => {
+      const f = asExtractedField(raw);
+      if (usable(f)) push(label, plain(f), [f], f, path);
+    });
+    [['Medication', 'current_medications'], ['Allergy', 'allergies'], ['Family history', 'family_history']].forEach(([label, key]) => {
+      (Array.isArray(extraction[key]) ? extraction[key] : []).forEach((raw, i) => {
+        const f = asExtractedField(raw);
+        if (usable(f)) push(label, plain(f), [f], f, key + '[' + i + ']');
+      });
+    });
+    return rows;
+  }
+
+  function parseExtractionResult(data) {
+    if (!data || typeof data !== 'object' || typeof data.doc_id !== 'string' || !data.doc_id) return null;
+    if (!Object.prototype.hasOwnProperty.call(DOC_TYPE_LABELS, data.doc_type)) return null;
+    if (!data.extraction || typeof data.extraction !== 'object') return null;
+    return {
+      docId: data.doc_id,
+      docType: data.doc_type,
+      uploadedOn: typeof data.uploaded_on === 'string' ? data.uploaded_on : null,
+      rows: extractionRows(data.doc_type, data.extraction)
+    };
+  }
+
+  function buildUploadResultCard(result, filename) {
+    const label = DOC_TYPE_LABELS[result.docType];
+    const firstPage = result.rows.length ? Math.min(...result.rows.map((r) => r.page)) : 1;
+    const citationFor = (page, path, fieldLabel, quote) => ({
+      sourceType: 'uploaded_document', sourceId: result.docId, pageOrSection: String(page), fieldOrChunkId: path,
+      quoteOrValue: quote, docLabel: label, uploadedOn: result.uploadedOn, fieldLabel
+    });
+
+    const card = el('div', 'cite-card');
+    const main = el('button', 'cite-card-main');
+    main.type = 'button';
+    main.setAttribute('aria-label', 'Open source page: ' + label);
+    main.addEventListener('click', () => openCitationModal(citationFor(firstPage, null, null, '')));
+    const thumb = el('div', 'cite-thumb', 'Loading…');
+    main.appendChild(thumb);
+    const meta = el('div', 'cite-meta');
+    meta.appendChild(el('div', 'cite-title', label + (result.uploadedOn ? ' · uploaded ' + result.uploadedOn : '')));
+    meta.appendChild(el('span', 'cite-badge', 'Pending review'));
+    meta.appendChild(el('div', 'cite-sub', 'From ' + filename));
+    const n = result.rows.length;
+    meta.appendChild(el('div', 'cite-sub', n === 0 ? 'No fields extracted' : n + (n === 1 ? ' field' : ' fields') + ' extracted · click for the page image'));
+    main.appendChild(meta);
+    card.appendChild(main);
+    loadThumbnail(result.docId, firstPage, thumb);
+
+    if (n === 0) {
+      card.appendChild(el('div', 'upload-result-empty',
+        'Nothing could be read from this document. Try a clearer scan, or check that the document type is right.'));
+      return card;
+    }
+
+    const list = el('ul', 'cite-fields');
+    const items = result.rows.map((row, i) => {
+      const li = el('li');
+      const btn = el('button', 'cite-field');
+      btn.type = 'button';
+      btn.title = 'Show where this value appears on the page';
+      btn.appendChild(el('span', 'cite-field-label', row.label));
+      btn.appendChild(el('span', 'cite-field-value', row.text));
+      if (row.confidence !== 'high') btn.appendChild(el('span', 'cite-field-conf', CONFIDENCE_NOTE[row.confidence]));
+      btn.addEventListener('click', () => openCitationModal(citationFor(row.page, row.path, row.label, row.quote)));
+      li.appendChild(btn);
+      li.hidden = i >= VISIBLE_FIELDS;
+      list.appendChild(li);
+      return li;
+    });
+    card.appendChild(list);
+    if (items.length > VISIBLE_FIELDS) {
+      const more = el('button', 'cite-more', 'Show ' + (items.length - VISIBLE_FIELDS) + ' more fields');
+      more.type = 'button';
+      more.setAttribute('aria-expanded', 'false');
+      more.addEventListener('click', () => {
+        const expanded = more.getAttribute('aria-expanded') === 'true';
+        items.forEach((li, i) => { li.hidden = expanded && i >= VISIBLE_FIELDS; });
+        more.setAttribute('aria-expanded', String(!expanded));
+        more.textContent = expanded ? 'Show ' + (items.length - VISIBLE_FIELDS) + ' more fields' : 'Show fewer fields';
+      });
+      card.appendChild(more);
+    }
+    return card;
+  }
+
+  function addUploadResult(result, filename) {
+    const bubble = el('div', 'bubble agent');
+    const article = result.docType === 'intake_form' ? 'an ' : 'a ';
+    bubble.appendChild(el('p', null, 'I read “' + filename + '” as ' + article + DOC_TYPE_LABELS[result.docType].toLowerCase() +
+      '. Ask a question and I’ll use it.'));
+    agentRow(bubble, [buildUploadResultCard(result, filename)]);
+  }
+
+  function handleUploadResponse(xhr, file) {
+    if (xhr.status === 401) {
+      showGate({ message: 'Your session has ended. Log in again to keep using the Co-Pilot.', login: true });
+      return;
+    }
+    let data = null;
+    try { data = JSON.parse(xhr.responseText); } catch (e) { data = null; }
+
+    if (xhr.status === 200) {
+      const result = parseExtractionResult(data);
+      if (!result) {
+        setUploadError('The document was sent, but the reply couldn’t be understood. Reload the page and check the chart before trying again.');
+        return;
+      }
+      addUploadResult(result, file.name);
+      setPendingDocument(result, file.name);
+      closeUploadPanel();
+      input.focus();
+      return;
+    }
+    const code = data && typeof data.detail_code === 'string' ? data.detail_code : '';
+    if (Object.prototype.hasOwnProperty.call(UPLOAD_ERROR_TEXT, code)) setUploadError(UPLOAD_ERROR_TEXT[code]);
+    else if (data && typeof data.error === 'string' && data.error) setUploadError(data.error);
+    else setUploadError('The upload failed (HTTP ' + xhr.status + '). Try again.');
+  }
+
+  function startUpload() {
+    if (state.uploading || state.patientId === null || state.busy) return;
+    const file = fileInput.files && fileInput.files[0];
+    const problem = validateUploadFile(file);
+    if (problem) { setUploadError(problem); return; }
+    setUploadError('');
+
+    const epoch = state.epoch;
+    const docType = Object.prototype.hasOwnProperty.call(DOC_TYPE_LABELS, docTypeSelect.value) ? docTypeSelect.value : 'lab_pdf';
+    const body = new FormData();
+    body.append('patient_id', state.patientId);
+    body.append('doc_type', docType);
+    body.append('file', file, file.name);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/documents');
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
+    state.uploadXhr = xhr;
+    state.uploading = true;
+    state.uploadSent = false;
+    refreshControls();
+    setUploadStatus('Uploading…', 0);
+
+    // A result that arrives after the conversation moved on (or after Cancel) is dropped.
+    const stale = () => epoch !== state.epoch || xhr !== state.uploadXhr;
+    const finish = () => {
+      if (xhr !== state.uploadXhr) return;
+      state.uploadXhr = null;
+      state.uploading = false;
+      refreshControls();
+    };
+    xhr.upload.onprogress = (e) => {
+      if (stale() || !e.lengthComputable) return;
+      setUploadStatus('Uploading… ' + Math.round((e.loaded / e.total) * 100) + '%', e.loaded / e.total);
+    };
+    xhr.upload.onload = () => {
+      if (stale()) return;
+      state.uploadSent = true;
+      setUploadStatus('Reading the document: OCR and field extraction can take up to a minute…', null);
+    };
+    xhr.onload = () => {
+      const wasStale = stale();
+      finish();
+      if (wasStale) return;
+      setUploadStatus('');
+      handleUploadResponse(xhr, file);
+    };
+    xhr.onerror = () => {
+      const wasStale = stale();
+      finish();
+      if (wasStale) return;
+      setUploadStatus('');
+      setUploadError('Something went wrong reaching the Co-Pilot. The upload did not finish; try again.');
+    };
+    xhr.ontimeout = () => {
+      const wasStale = stale();
+      finish();
+      if (wasStale) return;
+      setUploadStatus('');
+      setUploadError('Reading the document took longer than ' + (UPLOAD_TIMEOUT_MS / 1000) +
+        ' seconds, so this page stopped waiting. It may still finish on the server and appear on the chart; check before uploading again.');
+    };
+    xhr.send(body);
+  }
+
+  attachBtn.addEventListener('click', () => {
+    if (uploadPanel.hidden) openUploadPanel();
+    else if (!state.uploading) closeUploadPanel();
+  });
+  uploadBtn.addEventListener('click', startUpload);
+  uploadCancel.addEventListener('click', () => {
+    const sent = state.uploading && state.uploadSent;
+    abortUpload();
+    refreshControls();
+    closeUploadPanel();
+    attachBtn.focus();
+    if (sent) {
+      addPlainAgentMessage('Upload cancelled. The file had already been sent, so it may still appear on the chart.');
+    }
+  });
+  fileInput.addEventListener('change', () => setUploadError(''));
+  docChipRemove.addEventListener('click', () => { clearPendingDocument(); input.focus(); });
+  uploadPanel.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !state.uploading) { closeUploadPanel(); attachBtn.focus(); }
+  });
+
+  // -------------------------------------------------------------- sending
+
+  async function sendTurn(text) {
+    const epoch = state.epoch;
+    const patientId = state.patientId;
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+
+    state.inflight = controller;
+    state.lastUserText = text;
+    setBusy(true);
+    addTypingIndicator();
+
+    const retry = () => sendTurn(text);
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          message: text,
+          patient_id: patientId,
+          conversation_id: state.conversationId,
+          uploaded_document_ref: state.pendingDocRef
+        })
+      });
+      if (epoch !== state.epoch) return;
+
+      if (res.status === 401) {
+        removeTypingIndicator();
+        showGate({ message: 'Your session has ended. Log in again to keep using the Co-Pilot.', login: true });
+        return;
+      }
+      if (!res.ok) {
+        removeTypingIndicator();
+        addErrorMessage(`The Co-Pilot couldn’t answer (HTTP ${res.status}). Your question was not answered.`, retry);
+        return;
+      }
+
+      const turn = parseChatResponse(await res.json());
+      if (epoch !== state.epoch) return;
+      if (turn.conversationId) state.conversationId = turn.conversationId;
+      // The document rides along with exactly one answered question (the server contract for
+      // uploaded_document_ref). A failed send keeps it, so a retry still carries it.
+      clearPendingDocument();
+      removeTypingIndicator();
+      addAgentMessage(turn);
+    } catch (err) {
+      if (epoch !== state.epoch) return;
+      removeTypingIndicator();
+      addErrorMessage(timedOut
+        ? `The Co-Pilot didn’t respond within ${REQUEST_TIMEOUT_MS / 1000} seconds. It may still be working on it; retrying sends the question again.`
+        : 'Something went wrong reaching the Co-Pilot. Your question was not answered.', retry);
+    } finally {
+      clearTimeout(timer);
+      if (epoch === state.epoch) {
+        state.inflight = null;
+        setBusy(false);
+        if (state.patientId !== null) input.focus();
+      }
+    }
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text || state.patientId === null || state.busy) return;
+
+    // The URL is the source of truth for which patient this page is about.
+    // If it moved under us (history navigation), re-sync instead of sending
+    // this message into the previous patient's conversation.
+    if (currentUrlPatient() !== state.requestedPatient) {
+      applyPatientFromUrl();
+      return;
+    }
+
+    addUserMessage(text);
+    input.value = '';
+    sendTurn(text);
+  });
+
+  // ------------------------------------------------ conversation / patient
+
+  // Discards everything tied to the current conversation. Bumping the epoch
+  // orphans any in-flight request; aborting it also frees the connection.
+  function resetConversation() {
+    state.epoch += 1;
+    thumbCache.clear();
+    if (state.inflight) state.inflight.abort();
+    state.inflight = null;
+    state.conversationId = null;
+    state.lastUserText = null;
+    resetUploadUi();
+    log.replaceChildren();
+    closeCitationModal();
+    setBusy(false);
+  }
+
+  function currentUrlPatient() {
+    const value = new URLSearchParams(location.search).get('patient');
+    return value && value.trim() ? value.trim() : null;
+  }
+
+  function renderPatientBar(mode, patient) {
+    patientBar.replaceChildren();
+    patientBar.className = 'patient-bar' + (mode === 'error' ? ' error' : '');
+    patientBar.appendChild(el('span', 'label', 'Patient'));
+
+    if (mode === 'loading') {
+      patientBar.appendChild(el('span', 'pmeta', 'Loading patient details…'));
+    } else if (mode === 'none') {
+      patientBar.appendChild(el('span', 'pmeta', 'No patient selected'));
+    } else if (mode === 'error') {
+      const msg = el('span', 'pmeta', patient);
+      msg.setAttribute('role', 'alert');
+      patientBar.appendChild(msg);
+      const retry = el('button', 'ghost', 'Retry');
+      retry.type = 'button';
+      retry.addEventListener('click', () => loadPatient(state.requestedPatient));
+      patientBar.appendChild(retry);
+    } else {
+      patientBar.appendChild(el('span', 'pname', patient.name));
+      const meta = [];
+      if (patient.birthDate) meta.push('DOB ' + patient.birthDate);
+      if (patient.gender) meta.push(patient.gender);
+      if (meta.length) patientBar.appendChild(el('span', 'pmeta', meta.join(' · ')));
+      patientBar.appendChild(el('span', 'pid', 'ID ' + patient.id));
+    }
+    patientBar.hidden = false;
+  }
+
+  function showNoPatient() {
+    state.patientId = null;
+    refreshControls();
+    renderPatientBar('none');
+    const bubble = el('div', 'bubble agent');
+    bubble.appendChild(el('p', null,
+      'Open this page with a patient in the address, e.g. /ui?patient=<patient id>, to start a conversation about that chart.'));
+    const extras = [];
+    if (!DEFAULT_PATIENT_ID.startsWith('__')) {
+      const link = el('a', 'btn', 'Use the demo patient');
+      link.href = '/ui?patient=' + encodeURIComponent(DEFAULT_PATIENT_ID);
+      const wrap = el('div');
+      wrap.appendChild(link);
+      extras.push(wrap);
+    }
+    agentRow(bubble, extras);
+  }
+
+  async function loadPatient(requested) {
+    const epoch = state.epoch;
+    state.patientId = null;
+    refreshControls();
+    renderPatientBar('loading');
+
+    const fail = (message) => {
+      if (epoch === state.epoch) renderPatientBar('error', message);
+    };
+
+    let res;
+    try {
+      res = await fetch('/patient?patient_id=' + encodeURIComponent(requested));
+    } catch (err) {
+      fail('Couldn’t load patient details — chat is disabled until the patient is confirmed.');
+      return;
+    }
+    if (epoch !== state.epoch) return;
+
+    if (res.status === 401) {
+      showGate({ message: 'Your session has ended. Log in again to keep using the Co-Pilot.', login: true });
+      return;
+    }
+    if (res.status === 400 || res.status === 404) {
+      fail(res.status === 400
+        ? 'That isn’t a valid patient ID.'
+        : 'No patient found for that ID, or you don’t have access to it.');
+      return;
+    }
+    if (!res.ok) {
+      fail('Couldn’t load patient details — chat is disabled until the patient is confirmed.');
+      return;
+    }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      data = null;
+    }
+    if (epoch !== state.epoch) return;
+    if (!data || typeof data.patient_id !== 'string' || typeof data.name !== 'string') {
+      fail('Couldn’t read patient details — chat is disabled until the patient is confirmed.');
+      return;
+    }
+
+    // From here on the canonical ID the server echoed is the only ID used.
+    state.patientId = data.patient_id;
+    renderPatientBar('loaded', {
+      id: data.patient_id,
+      name: data.name,
+      birthDate: typeof data.birth_date === 'string' ? data.birth_date : null,
+      gender: typeof data.gender === 'string' ? data.gender : null
+    });
+    addPlainAgentMessage(OPENING_MESSAGE);
+    refreshControls();
+    input.focus();
+  }
+
+  // Starts a fresh conversation whenever the patient in the URL differs from
+  // the one the page last acted on, so a conversation_id can never carry
+  // over from one patient to another.
+  function applyPatientFromUrl() {
+    resetConversation();
+    const requested = currentUrlPatient();
+    state.requestedPatient = requested;
+    if (requested === null) {
+      showNoPatient();
+    } else {
+      loadPatient(requested);
+    }
+  }
+
+  function handleUrlChange() {
+    if (!log.hidden && currentUrlPatient() !== state.requestedPatient) applyPatientFromUrl();
+  }
+  window.addEventListener('popstate', handleUrlChange);
+  window.addEventListener('pageshow', handleUrlChange);
+
+  newConvoBtn.addEventListener('click', function () {
+    // Same patient, fresh conversation: re-verify the header too, so the
+    // identity on screen is always one the server just confirmed.
+    applyPatientFromUrl();
+  });
+
+  // ----------------------------------------------------------------- init
+
+  async function init() {
+    let res;
+    try {
+      res = await fetch('/me');
+    } catch (err) {
+      showGate({ message: 'Couldn’t reach the Co-Pilot server.', retry: true });
+      return;
+    }
+    if (res.status === 401) {
+      showGate({ message: 'Log in with your OpenEMR account to use the Co-Pilot.', login: true });
+      return;
+    }
+    if (!res.ok) {
+      showGate({ message: `The Co-Pilot server returned an error (HTTP ${res.status}).`, retry: true });
+      return;
+    }
+
+    let me = null;
+    try {
+      me = await res.json();
+    } catch (err) {
+      me = null;
+    }
+    const resident = $('resident');
+    resident.textContent = me && typeof me.resident === 'string' && me.resident
+      ? 'Logged in as ' + me.resident
+      : 'Logged in';
+    resident.hidden = false;
+
+    showChat();
+    applyPatientFromUrl();
+  }
+
+  $('gate-retry').addEventListener('click', init);
+  init();
+})();
+</script>
+
+</body>
+</html>
